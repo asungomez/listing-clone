@@ -1,0 +1,17 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Back-end Django",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/back-end/src/manage.py",
+      "args": ["runserver", "0.0.0.0:8000"],
+      "django": true,
+      "justMyCode": false,
+      "cwd": "${workspaceFolder}/back-end",
+      "envFile": "${workspaceFolder}/back-end/src/.env",
+      "python": "${workspaceFolder}/back-end/venv/bin/python"
+    }
+  ]
+}
