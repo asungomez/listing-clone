@@ -151,9 +151,9 @@ docker compose up app
 
 The front-end uses React, Typescript and Vite.
 
-### Running the application in your host machine
+### Running the application as a Node process
 
-The front-end runs as a Node process, so you need to have Node.js installed. It is recommended to use Node.js 22.x.
+You need to have Node.js installed. It is recommended to use Node.js 22.x.
 
 #### Installing Node.js
 
@@ -187,3 +187,68 @@ yarn dev
 ```
 
 The application will be available at http://localhost:5173.
+
+### Running the application using Docker
+
+The front-end can also be run using Docker. This is useful for testing the application in a production-like environment.
+
+#### Importing self-signed certificates
+
+When working on a company computer, there are self-signed certificates that can make the Docker image build to fail. To prevent this, follow the steps below:
+
+- Enter JLL Self-Service
+- Execute the Netskope Developer Tool Configuration
+- Create a directory at the in the `back-end` directory called `.certs`
+- Copy the certificate file netskope-cert-bundle.pem into `.certs/netskope-cert-bundle.pem`
+
+#### Spinning up the container
+
+To spin up the container, you can use the following command:
+
+```bash
+docker compose up app
+```
+
+## End to end tests
+
+The e2e tests are written in Playwright and use pytest as the test runner.
+
+### Setting up the e2e tests
+
+You'll need a virtual environment inside the `e2e-tests` directory. You can create it using the following command:
+
+```bash
+python3.13 -m venv venv
+```
+
+Enable the virtual environment:
+
+```bash
+source venv/bin/activate
+```
+
+Install the dependencies for the e2e tests using:
+
+```bash
+pip install -r requirements.txt
+```
+
+And finally, install the Playwright browsers:
+
+```bash
+playwright install
+```
+
+### Running the e2e tests
+
+To run the e2e tests in the command-line, you can use the following command:
+
+```bash
+pytest
+```
+
+To open a browser and debug the tests, you can use the `--headed` option:
+
+```bash
+pytest --headed
+```
