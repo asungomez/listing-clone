@@ -128,6 +128,8 @@ def tests_helper(request: pytest.FixtureRequest) -> Helper:
         back_end_container = (
             DockerContainer(image=back_end_image.id)
             .with_exposed_ports(8000)
+            .with_env("ALLOWED_ORIGINS", "*")
+            .with_env("ALLOWED_HOSTS", "*")
             .with_env("DB_HOST", "db")
             .with_env("DB_NAME", "test")
             .with_env("DB_PASSWORD", "test")
@@ -161,13 +163,16 @@ def tests_helper(request: pytest.FixtureRequest) -> Helper:
 
         # Build the front-end image
         logger.info("Building front-end image")
-        back_end_url = "http://back-end:8000"
+        # Get the external back-end URL
+        back_end_host = back_end_container.get_container_host_ip()
+        back_end_port = back_end_container.get_exposed_port(8000)
+        back_end_url = f"http://{back_end_host}:{back_end_port}"
         login_redirect = f"{back_end_url}/users/login-callback"
         front_end_image, _ = docker_client.images.build(
             path="../front-end",
             buildargs={
                 "BUILD_ENV": build_env,
-                "OKTA_DOMAIN": "http://mockserver:1080/okta",
+                "OKTA_DOMAIN": "http://localhost:1080/okta",
                 "OKTA_CLIENT_ID": "client-id",
                 "OKTA_LOGIN_REDIRECT": login_redirect,
                 "API_URL": back_end_url
@@ -207,7 +212,8 @@ def tests_helper(request: pytest.FixtureRequest) -> Helper:
         helper = Helper(
             db_port=db_port,
             mockserver_url=mockserver_external_url,
-            back_end_url=back_end_url
+            back_end_url=back_end_url,
+            front_end_url=front_end_url
           )
         return helper
     except Exception as e:

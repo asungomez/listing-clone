@@ -20,26 +20,43 @@ import environ  # type: ignore
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 env = environ.Env(
-    ALLOWED_HOSTS=(list[str], []), # Allowed hosts for the Django app
-    ALLOWED_ORIGINS=(list[str], []), # Allowed origins for CORS
-    DB_HOST=(str, None), # Database host
-    DB_NAME=(str, None), # Database name
-    DB_PASSWORD=(str, None), # Database password
-    DB_PORT=(int, None), # Database port
-    DB_USER=(str, None), # Database user
-    DEBUG=(bool, False), # Debug mode for Django
+    # Allowed hosts for the Django app
+    ALLOWED_HOSTS=(list[str], []),
+    # Allowed origins for CORS
+    ALLOWED_ORIGINS=(list[str], []),
+    # Database host
+    DB_HOST=(str, None),
+    # Database name
+    DB_NAME=(str, None),
+    # Database password
+    DB_PASSWORD=(str, None),
+    # Database port
+    DB_PORT=(int, None),
+    # Database user
+    DB_USER=(str, None),
+    # Debug mode for Django
+    DEBUG=(bool, False),
+    # Secret key for Django
     DJANGO_SECRET_KEY=(
         str,
         "django-insecure-trkc%c14mv8b%95!spl5n&sg51f7wsyvasx%7ddl$07-f-iynh",
-    ), # Secret key for Django
-    ENCRYPTION_KEY=(str, None), # Key used for encrypting sensitive data
-    FRONT_END_URL=(str, None), # Frontend URL for the application
-    MOCK_AUTH=(bool, False), # Allow mock authentication (used only during testing)
-    OKTA_CLIENT_ID=(str, None), # Okta client ID
-    OKTA_CLIENT_SECRET=(str, None), # Okta client secret
-    OKTA_DOMAIN=(str, None), # Okta domain
-    OKTA_LOGIN_REDIRECT=(str, None), # Okta login redirect URL
-    USE_HTTPS=(bool, True), # Whether to run the application using HTTPS (affects secure cookies)
+    ),
+    # Key used for encrypting sensitive data
+    ENCRYPTION_KEY=(str, None),
+    # Frontend URL for the application
+    FRONT_END_URL=(str, None),
+    # Allow mock authentication (used only during testing)
+    MOCK_AUTH=(bool, False),
+    # Okta client ID
+    OKTA_CLIENT_ID=(str, None),
+    # Okta client secret
+    OKTA_CLIENT_SECRET=(str, None),
+    # Okta domain
+    OKTA_DOMAIN=(str, None),
+    # Okta login redirect URL
+    OKTA_LOGIN_REDIRECT=(str, None),
+    # Whether to run the application using HTTPS (affects secure cookies)
+    USE_HTTPS=(bool, True),
 )
 
 environ.Env.read_env(os.path.join(BASE_DIR, ".env"))
@@ -55,6 +72,7 @@ ENCRYPTION_KEY = env.str("ENCRYPTION_KEY")
 ALLOWED_HOSTS: list[str] = env.list("ALLOWED_HOSTS")
 CORS_ALLOWED_ORIGINS: list[str] = env.list("ALLOWED_ORIGINS")
 CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_ALL_ORIGINS = env.list("ALLOWED_HOSTS").count("*") > 0
 
 
 # Application definition
@@ -72,7 +90,6 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
-    "core.auth.CustomAuthMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -80,6 +97,7 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "core.auth.CustomAuthMiddleware",
 ]
 
 ROOT_URLCONF = "app.urls"
@@ -116,7 +134,6 @@ DATABASES = {
         "PORT": env.int("DB_PORT"),
     }
 }
-
 
 
 # Internationalization

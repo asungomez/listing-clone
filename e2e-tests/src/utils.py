@@ -1,8 +1,10 @@
+import json
 import logging
 import time
-from typing import Optional
+from typing import Any, Dict, Optional
 
 import psycopg2
+from playwright.sync_api import Page
 
 logger = logging.getLogger(__name__)
 
@@ -14,12 +16,14 @@ class Helper:
     db_connection: psycopg2.extensions.connection
     mockserver_url: str
     back_end_url: str
+    front_end_url: str
 
     def __init__(
             self,
             db_port: int,
             mockserver_url: str,
-            back_end_url: str
+            back_end_url: str,
+            front_end_url: str
             ):
         """
         Initialize the Helper class.
@@ -27,9 +31,11 @@ class Helper:
         :param db_port: The port of the database
         :param mockserver_url: The URL of the MockServer
         :param back_end_url: The URL of the back-end service
+        :param front_end_url: The URL of the front-end service
         """
         self.mockserver_url = mockserver_url
         self.back_end_url = back_end_url
+        self.front_end_url = front_end_url
 
         max_retries = 3
         retry_delay = 1
@@ -68,3 +74,30 @@ class Helper:
         """Close the database connection when the object is destroyed."""
         if self.db_connection:
             self.db_connection.close()
+
+    def authenticate_as(
+        self,
+        page: Page,
+        email: str,
+        **token_extras: Dict[str, Any]
+    ) -> Page:
+        """
+        Authenticate the user with the given email.
+
+        :param page: The Playwright page object
+        :param email: The email of the user to authenticate
+        :param token_extras: Additional token claims to include in the JWT
+        Possible keys include:
+            - is_expired: bool, whether the token is expired
+        :return: A new page with the authentication token set in the headers
+        """
+        token_payload = {"sub": email, **token_extras}
+        token_json = json.dumps(token_payload)
+        context = page.context.browser.new_context(
+            extra_http_headers={
+                "Authorization": f"Bearer {token_json}",
+            },
+            base_url=self.front_end_url
+        )
+        auth_page = context.new_page()
+        return auth_page

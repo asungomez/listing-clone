@@ -2,16 +2,20 @@ import json
 from typing import Optional, Tuple
 
 import requests
+from core.crypto import Crypto
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.middleware import AuthenticationMiddleware
 from django.contrib.auth.models import AnonymousUser
-from django.http import HttpRequest, HttpResponse
-
-from core.crypto import Crypto
+from django.http import HttpRequest, HttpResponse, JsonResponse
 from user.serializers import UserSerializer
 
 User = get_user_model()
+
+
+class SessionExpiredException(Exception):
+    """Raised when the credentials are expired"""
+    pass
 
 
 class TokenManager:
@@ -36,9 +40,12 @@ class TokenManager:
         # In testing environments we don't use real Okta, so the token is
         # just a JSON string containing the claims
         if settings.MOCK_AUTH:
-            # Decode the token as a JSON string
             decoded_token = json.loads(access_token)
-            # Get the email from the decoded token
+            is_expired: bool = decoded_token.get("is_expired", False)
+            if is_expired:
+                raise SessionExpiredException(
+                    "The credentials are expired"
+                )
             mock_email: str = decoded_token.get('sub')
             return mock_email, access_token, refresh_token
 
@@ -54,6 +61,10 @@ class TokenManager:
                 )
             headers["Authorization"] = f"Bearer {access_token}"
             response = requests.get(url, headers=headers)
+            if response.status_code == 401:
+                raise SessionExpiredException(
+                    "The credentials are expired"
+                )
         response.raise_for_status()
         userinfo = response.json()
         email: str = userinfo.get("email")
@@ -183,7 +194,21 @@ class CustomAuthMiddleware(AuthenticationMiddleware):
     access_token: Optional[str] = None
     refresh_token: Optional[str] = None
 
-    def process_request(self, request: HttpRequest) -> None:
+    def __call__(self, request: HttpRequest) -> HttpResponse:
+        """
+        Call the middleware. This method is called by Django.
+
+        :param request: The request object
+        :return: The response from the view or an error response
+        """
+        error_response = self.process_request(request)
+        if error_response is not None:
+            return error_response
+
+        response = self.get_response(request)
+        return self.process_response(request, response)
+
+    def process_request(self, request: HttpRequest) -> Optional[HttpResponse]:
         """
         Process the request to authenticate the user based on the token
 
@@ -199,9 +224,11 @@ class CustomAuthMiddleware(AuthenticationMiddleware):
             email, at, rt = self.verifier.authenticate(at, rt)
             user = self.serializer.find_by_email(email)
             request.user = user
-        except Exception as e:
-            print(f"Authentication failed: {str(e)}")
-            request.user = AnonymousUser()
+        except SessionExpiredException as e:
+            return JsonResponse(
+                {"message": str(e), "code": "session_expired"},
+                status=401
+            )
 
     def process_response(
         self,

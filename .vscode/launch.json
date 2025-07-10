@@ -12,6 +12,25 @@
       "cwd": "${workspaceFolder}/back-end",
       "envFile": "${workspaceFolder}/back-end/src/.env",
       "python": "${workspaceFolder}/back-end/venv/bin/python"
+    },
+    {
+      "name": "Headless E2E tests",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "justMyCode": false,
+      "cwd": "${workspaceFolder}/e2e-tests",
+      "python": "${workspaceFolder}/e2e-tests/venv/bin/python"
+    },
+    {
+      "name": "Headed E2E tests",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": ["--headed"],
+      "justMyCode": false,
+      "cwd": "${workspaceFolder}/e2e-tests",
+      "python": "${workspaceFolder}/e2e-tests/venv/bin/python"
     }
   ]
 }
