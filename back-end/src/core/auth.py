@@ -18,6 +18,11 @@ class SessionExpiredException(Exception):
     pass
 
 
+class SessionInvalidException(Exception):
+    """Raised when the credentials are invalid"""
+    pass
+
+
 class TokenManager:
     """
     Class to manage Okta authentication and token handling
@@ -41,12 +46,19 @@ class TokenManager:
         # just a JSON string containing the claims
         if settings.MOCK_AUTH:
             decoded_token = json.loads(access_token)
+            is_invalid: bool = decoded_token.get("is_invalid", False)
+            if is_invalid:
+                raise SessionInvalidException(
+                    "The credentials are invalid"
+                )
             is_expired: bool = decoded_token.get("is_expired", False)
             if is_expired:
                 raise SessionExpiredException(
                     "The credentials are expired"
                 )
             mock_email: str = decoded_token.get('sub')
+            if not mock_email:
+                raise SessionInvalidException("Email not found in the token")
             return mock_email, access_token, refresh_token
 
         url = f"{settings.OKTA['DOMAIN']}/userinfo"
@@ -69,7 +81,7 @@ class TokenManager:
         userinfo = response.json()
         email: str = userinfo.get("email")
         if not email:
-            raise ValueError("Email not found in the token")
+            raise SessionInvalidException("Email not found in the token")
         return email, access_token, refresh_token
 
     def get_tokens_from_provider(self, code: str) -> Tuple[str, str]:
@@ -227,6 +239,11 @@ class CustomAuthMiddleware(AuthenticationMiddleware):
         except SessionExpiredException as e:
             return JsonResponse(
                 {"message": str(e), "code": "session_expired"},
+                status=401
+            )
+        except SessionInvalidException as e:
+            return JsonResponse(
+                {"message": str(e), "code": "session_invalid"},
                 status=401
             )
 

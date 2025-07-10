@@ -101,6 +101,7 @@ class Helper:
         :param token_extras: Additional key-value pairs to include in
         the token.
         - is_expired: If True, simulates an expired session.
+        - is_invalid: If True, simulates an invalid session.
         :return: A context manager that sets the authentication headers
         """
         token_payload = {"sub": email, **token_extras}

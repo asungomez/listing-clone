@@ -31,6 +31,9 @@ export const AuthProvider: FC<AuthProviderProps> = ({ children }) => {
               const errorCode = error.response.data?.code;
               if (errorCode === "session_expired") {
                 errorMessage = "Your session has expired. Please log in again.";
+              } else if (errorCode === "session_invalid") {
+                errorMessage =
+                  "Your credentials are invalid. Please log in again.";
               }
             }
           }
