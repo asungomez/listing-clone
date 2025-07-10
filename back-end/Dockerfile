@@ -11,7 +11,7 @@ ONBUILD ENV CURL_CA_BUNDLE=/etc/ssl/certs/netskope-cert-bundle.pem
 
 FROM base_image AS production_builder
 
-FROM ${BUILD_ENV}_builder as builder
+FROM ${BUILD_ENV}_builder AS builder
 
 RUN apk add --update --no-cache \
     postgresql-client &&\
