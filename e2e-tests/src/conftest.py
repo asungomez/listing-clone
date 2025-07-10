@@ -1,11 +1,14 @@
 import logging
-import pytest
-from utils import Helper
-import docker
-from testcontainers.core.network import Network  # type: ignore
-from testcontainers.core.container import DockerContainer  # type: ignore
 import os
+from typing import Any, Dict
+
+import docker
+import pytest
+from testcontainers.core.container import DockerContainer  # type: ignore
+from testcontainers.core.network import Network  # type: ignore
 from testcontainers.core.waiting_utils import wait_for_logs  # type: ignore
+
+from .utils import Helper
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -14,14 +17,16 @@ logger = logging.getLogger(__name__)
 _front_end_url = None
 
 
-def set_base_url(url):
+def set_base_url(url: str) -> None:
     """Set the base URL for Playwright tests"""
     global _front_end_url
     _front_end_url = url
 
 
 @pytest.fixture(scope="session")
-def browser_context_args(browser_context_args):
+def browser_context_args(
+    browser_context_args: Dict[str, Any]
+) -> Dict[str, Any]:
     """Override the browser_context_args fixture to set the base URL"""
     global _front_end_url
     if _front_end_url:

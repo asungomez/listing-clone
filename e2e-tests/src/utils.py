@@ -1,6 +1,8 @@
 import logging
-import psycopg2
 import time
+from typing import Optional
+
+import psycopg2
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +33,7 @@ class Helper:
 
         max_retries = 3
         retry_delay = 1
-        last_exception = None
+        last_exception: Optional[Exception] = None
 
         for attempt in range(max_retries):
             try:
@@ -55,13 +57,14 @@ class Helper:
                     time.sleep(retry_delay)
                     retry_delay *= 2  # Exponential backoff
 
-        # If we get here, all connection attempts failed
-        logger.error(
-          f"All database connection attempts failed: {str(last_exception)}"
-          )
-        raise last_exception
+        if last_exception:
+            logger.error(
+                "All database connection attempts failed:"
+                f" {str(last_exception)}"
+            )
+            raise last_exception
 
-    def __del__(self):
+    def __del__(self) -> None:
         """Close the database connection when the object is destroyed."""
         if self.db_connection:
             self.db_connection.close()
