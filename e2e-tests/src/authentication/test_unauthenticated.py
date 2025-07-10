@@ -24,12 +24,12 @@ def test_visit_page_with_expired_credentials(
     login page with a message indicating the session has expired.
     """
 
-    page = tests_helper.authenticate_as(
+    with tests_helper.authenticated_context(
         page=page,
         email="made-up-email@email.net",
-        is_expired=True  # Simulate expired credentials
-        )
-    page.goto("/")
-    expect(
-        page.get_by_text("Your session has expired. Please log in again.")
-    ).to_be_visible()
+        is_expired=True
+    ):
+        page.goto("/")
+        expect(
+            page.get_by_text("Your session has expired. Please log in again.")
+        ).to_be_visible()

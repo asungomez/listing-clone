@@ -1,6 +1,7 @@
 import json
 import logging
 import time
+from contextlib import contextmanager
 from typing import Any, Dict, Optional
 
 import psycopg2
@@ -75,29 +76,39 @@ class Helper:
         if self.db_connection:
             self.db_connection.close()
 
-    def authenticate_as(
+    @contextmanager
+    def authenticated_context(
         self,
         page: Page,
         email: str,
         **token_extras: Dict[str, Any]
-    ) -> Page:
+    ):
         """
-        Authenticate the user with the given email.
+        Context manager for authentication that automatically cleans up.
 
-        :param page: The Playwright page object
-        :param email: The email of the user to authenticate
-        :param token_extras: Additional token claims to include in the JWT
-        Possible keys include:
-            - is_expired: bool, whether the token is expired
-        :return: A new page with the authentication token set in the headers
+        Usage:
+        with tests_helper.authenticated_context(
+            page,
+            "user@example.com",
+            is_expired=True
+        ):
+            page.goto("/")
+            # Test with authentication
+        # Headers are automatically cleared when exiting the context
+
+        :param page: The Playwright Page object to set headers on.
+        :param email: The email address to use for authentication.
+        :param token_extras: Additional key-value pairs to include in
+        the token.
+        - is_expired: If True, simulates an expired session.
+        :return: A context manager that sets the authentication headers
         """
         token_payload = {"sub": email, **token_extras}
         token_json = json.dumps(token_payload)
-        context = page.context.browser.new_context(
-            extra_http_headers={
-                "Authorization": f"Bearer {token_json}",
-            },
-            base_url=self.front_end_url
-        )
-        auth_page = context.new_page()
-        return auth_page
+        page.set_extra_http_headers({
+            "Authorization": f"Bearer {token_json}",
+        })
+        try:
+            yield
+        finally:
+            page.set_extra_http_headers({})
