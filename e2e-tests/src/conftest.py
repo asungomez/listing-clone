@@ -8,6 +8,7 @@ from testcontainers.core.container import DockerContainer  # type: ignore
 from testcontainers.core.network import Network  # type: ignore
 from testcontainers.core.waiting_utils import wait_for_logs  # type: ignore
 
+from .factories.user import UserFactory
 from .utils import Helper
 
 logging.basicConfig(level=logging.INFO)
@@ -161,6 +162,17 @@ def tests_helper(request: pytest.FixtureRequest) -> Helper:
             timeout=30,
         )
 
+        # Run the DB migrations
+        logger.info("Running migrations")
+        exit_code, output = back_end_container.exec(
+            "python /app/manage.py migrate",
+        )
+        if exit_code != 0:
+            logger.error(f"Migration failed: {output.decode()}")
+            raise Exception("Failed to apply migrations")
+        else:
+            logger.info("Migrations applied successfully")
+
         # Build the front-end image
         logger.info("Building front-end image")
         # Get the external back-end URL
@@ -218,4 +230,30 @@ def tests_helper(request: pytest.FixtureRequest) -> Helper:
         return helper
     except Exception as e:
         logger.error("Error starting containerized system: %s", str(e))
-        raise Exception("Failed to start containerized system")
+        raise Exception(f"Failed to start containerized system: {str(e)}")
+
+
+@pytest.fixture(autouse=True)
+def tear_down(request: pytest.FixtureRequest, tests_helper: Helper) -> None:
+    """
+    Tear down after each test.
+    This is used to clean up the database and remove the mocks
+    after each test.
+    """
+
+    def cleanup() -> None:
+        tests_helper.clean_up_db()
+
+    request.addfinalizer(cleanup)
+
+
+@pytest.fixture
+def user_factory() -> UserFactory:
+    """
+    Fixture that provides a UserFactory instance.
+
+    Usage:
+        def test_something(user_factory):
+            user = user_factory.generate(is_active=False)
+    """
+    return UserFactory()

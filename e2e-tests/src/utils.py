@@ -1,11 +1,14 @@
+import datetime
 import json
 import logging
-import time
 from contextlib import contextmanager
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
-import psycopg2
 from playwright.sync_api import Page
+from sqlalchemy import MetaData, Table, create_engine, inspect, text
+from sqlalchemy.engine import Engine
+
+from .factories.user import User
 
 logger = logging.getLogger(__name__)
 
@@ -14,10 +17,11 @@ class Helper:
     """
     Helper class with utilities for tests: DB seeding, mocks, etc.
     """
-    db_connection: psycopg2.extensions.connection
     mockserver_url: str
     back_end_url: str
     front_end_url: str
+    db_engine: Engine
+    db_metadata: MetaData
 
     def __init__(
             self,
@@ -34,47 +38,19 @@ class Helper:
         :param back_end_url: The URL of the back-end service
         :param front_end_url: The URL of the front-end service
         """
+        self.db_engine = create_engine(
+            f"postgresql+psycopg2://test:test@localhost:{db_port}/test"
+        )
+        self.db_metadata = MetaData()
+
         self.mockserver_url = mockserver_url
         self.back_end_url = back_end_url
         self.front_end_url = front_end_url
 
-        max_retries = 3
-        retry_delay = 1
-        last_exception: Optional[Exception] = None
-
-        for attempt in range(max_retries):
-            try:
-                self.db_connection = psycopg2.connect(
-                    database="test",
-                    user="test",
-                    host="localhost",
-                    password="test",
-                    port=db_port,
-                    connect_timeout=10  # Add a connection timeout
-                )
-                logger.info(
-                  "Successfully connected to the PostgreSQL database"
-                  )
-                return
-            except Exception as e:
-                last_exception = e
-                if attempt < max_retries - 1:
-                    logger.warning(f"Database connection failed: {str(e)}."
-                                   f" Retrying in {retry_delay} seconds...")
-                    time.sleep(retry_delay)
-                    retry_delay *= 2  # Exponential backoff
-
-        if last_exception:
-            logger.error(
-                "All database connection attempts failed:"
-                f" {str(last_exception)}"
-            )
-            raise last_exception
-
     def __del__(self) -> None:
         """Close the database connection when the object is destroyed."""
-        if self.db_connection:
-            self.db_connection.close()
+        if self.db_engine:
+            self.db_engine.dispose()
 
     @contextmanager
     def authenticated_context(
@@ -113,3 +89,66 @@ class Helper:
             yield
         finally:
             page.set_extra_http_headers({})
+
+    def clean_up_db(self) -> None:
+        """
+        Clean up the test database by deleting all data from tables
+        except those starting with 'django_'.
+        This is useful for resetting the database state between tests.
+        """
+        inspector = inspect(self.db_engine)
+        tables = inspector.get_table_names()
+
+        with self.db_engine.begin() as connection:
+            # Temporarily disable foreign key constraints
+            connection.execute(text("SET CONSTRAINTS ALL DEFERRED"))
+
+            # Process each table individually
+            for table in tables:
+                if not table.startswith("django_"):
+                    preparer = self.db_engine.dialect.identifier_preparer
+                    quoted_table = preparer.quote_identifier(table)
+
+                    # Use TRUNCATE for faster deletion
+                    connection.execute(text(
+                        f"TRUNCATE TABLE {quoted_table} CASCADE"
+                        ))
+
+            # Re-enable foreign key constraints
+            connection.execute(text("SET CONSTRAINTS ALL IMMEDIATE"))
+
+    def db_table(self, table_name: str) -> Table:
+        """
+        Get a SQLAlchemy Table object for the specified table name.
+
+        :param table_name: The name of the table to get.
+        :return: A SQLAlchemy Table object.
+        """
+        return Table(
+            table_name,
+            self.db_metadata,
+            autoload_with=self.db_engine
+        )
+
+    def insert_user(self, user: User) -> None:
+        """
+        Insert a user into the test database.
+
+        :param user: The User instance to insert.
+        """
+        with self.db_engine.begin() as connection:
+            users_table = self.db_table("core_user")
+            insert_stmt = users_table.insert().values(
+                password='',
+                last_login=datetime.datetime.now(),
+                email=user.email,
+                username=user.username,
+                first_name=user.first_name,
+                last_name=user.last_name,
+                date_joined=user.date_joined,
+                is_active=user.is_active,
+                is_superuser=user.is_superuser
+            )
+            result = connection.execute(insert_stmt)
+            id = result.inserted_primary_key[0]
+            user.id = id

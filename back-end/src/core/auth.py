@@ -235,6 +235,11 @@ class CustomAuthMiddleware(AuthenticationMiddleware):
             self.refresh_token = rt
             email, at, rt = self.verifier.authenticate(at, rt)
             user = self.serializer.find_by_email(email)
+            if not user.is_active:
+                return JsonResponse(
+                    {"message": "User is inactive", "code": "user_inactive"},
+                    status=403
+                )
             request.user = user
         except SessionExpiredException as e:
             return JsonResponse(

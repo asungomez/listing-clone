@@ -27,13 +27,18 @@ export const AuthProvider: FC<AuthProviderProps> = ({ children }) => {
         .catch((error) => {
           let errorMessage: string | undefined = undefined;
           if (error instanceof AxiosError) {
+            const errorCode = error.response?.data?.code;
             if (error.response?.status === 401) {
-              const errorCode = error.response.data?.code;
               if (errorCode === "session_expired") {
                 errorMessage = "Your session has expired. Please log in again.";
               } else if (errorCode === "session_invalid") {
                 errorMessage =
                   "Your credentials are invalid. Please log in again.";
+              }
+            } else if (error.response?.status === 403) {
+              if (errorCode === "user_inactive") {
+                errorMessage =
+                  "Your account is inactive. Please contact support.";
               }
             }
           }

@@ -1,4 +1,5 @@
 from playwright.sync_api import Page, expect
+from src.factories.user import UserFactory
 from src.utils import Helper
 
 
@@ -55,3 +56,25 @@ def test_visit_page_with_invalid_credentials(
                 "Your credentials are invalid. Please log in again."
             )
         ).to_be_visible()
+
+
+def test_inactive_user(
+    page: Page,
+    tests_helper: Helper,
+    user_factory: UserFactory
+) -> None:
+    """
+    Test that visiting the page with credentials of an inactive user
+    shows the login page with a message indicating the user is inactive.
+    """
+
+    user = user_factory.generate(is_active=False)
+    tests_helper.insert_user(user)
+    with tests_helper.authenticated_context(
+        page=page,
+        email=user.email
+    ):
+        page.goto("/")
+        expect(page.get_by_text(
+            "Your account is inactive. Please contact support."
+        )).to_be_visible()
