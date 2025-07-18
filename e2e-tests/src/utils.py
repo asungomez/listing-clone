@@ -2,7 +2,7 @@ import datetime
 import json
 import logging
 from contextlib import contextmanager
-from typing import Any, Dict
+from typing import Any, Generator
 
 from playwright.sync_api import Page
 from sqlalchemy import MetaData, Table, create_engine, inspect, text
@@ -57,8 +57,8 @@ class Helper:
         self,
         page: Page,
         email: str,
-        **token_extras: Dict[str, Any]
-    ):
+        **token_extras: Any
+    ) -> Generator[None, None, None]:
         """
         Context manager for authentication that automatically cleans up.
 
