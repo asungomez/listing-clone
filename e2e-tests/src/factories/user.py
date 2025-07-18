@@ -21,10 +21,10 @@ class UserFactory:
     """Factory for creating User instances for testing."""
     faker: Faker
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.faker = Faker()
 
-    def generate(self, **kwargs: Dict[str, Any]) -> User:
+    def generate(self, **kwargs: Any) -> User:
         """
         Generate a user with realistic fake data for unspecified fields.
 
@@ -34,7 +34,7 @@ class UserFactory:
 
         fake_email = self.faker.email()
         fake_username = fake_email.split('@')[0]
-        user_values = {
+        user_values: Dict[str, Any] = {
           'id': None,
           'is_superuser': False,
           'email': fake_email,
@@ -46,5 +46,4 @@ class UserFactory:
         }
         user_values.update(kwargs)
 
-        # Create and return user
         return User(**user_values)
