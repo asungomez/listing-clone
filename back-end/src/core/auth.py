@@ -1,5 +1,5 @@
 import json
-from typing import Optional, Tuple
+from typing import Awaitable, Optional, Tuple, Union
 
 import requests
 from core.crypto import Crypto
@@ -7,7 +7,8 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.middleware import AuthenticationMiddleware
 from django.contrib.auth.models import AnonymousUser
-from django.http import HttpRequest, HttpResponse, JsonResponse
+from django.http import HttpRequest, JsonResponse
+from django.http.response import HttpResponseBase
 from user.serializers import UserSerializer
 
 User = get_user_model()
@@ -20,6 +21,11 @@ class SessionExpiredException(Exception):
 
 class SessionInvalidException(Exception):
     """Raised when the credentials are invalid"""
+    pass
+
+
+class InactiveUserException(Exception):
+    """Raised when the user is inactive"""
     pass
 
 
@@ -167,9 +173,12 @@ class TokenManager:
             raise ValueError("Access token not found in the response")
         return access_token
 
-    def set_credentials_as_cookie(self, response: HttpResponse,
-                                  access_token: str,
-                                  refresh_token: str) -> None:
+    def set_credentials_as_cookie(
+        self,
+        response: HttpResponseBase,
+        access_token: str,
+        refresh_token: str
+    ) -> None:
         """
         Set the access and refresh tokens as a cookie in the response
         :param response: The response object
@@ -206,41 +215,18 @@ class CustomAuthMiddleware(AuthenticationMiddleware):
     access_token: Optional[str] = None
     refresh_token: Optional[str] = None
 
-    def __call__(self, request: HttpRequest) -> HttpResponse:
+    def __call__(self, request: HttpRequest) -> Union[
+        HttpResponseBase,
+        Awaitable[HttpResponseBase]
+    ]:
         """
         Call the middleware. This method is called by Django.
 
         :param request: The request object
         :return: The response from the view or an error response
         """
-        error_response = self.process_request(request)
-        if error_response is not None:
-            return error_response
-
-        response = self.get_response(request)
-        return self.process_response(request, response)
-
-    def process_request(self, request: HttpRequest) -> Optional[HttpResponse]:
-        """
-        Process the request to authenticate the user based on the token
-
-        :param request: The request object
-        """
         try:
-            at, rt = self.verifier.get_tokens_from_request(request)
-            if at is None or rt is None:
-                request.user = AnonymousUser()
-                return
-            self.access_token = at
-            self.refresh_token = rt
-            email, at, rt = self.verifier.authenticate(at, rt)
-            user = self.serializer.find_by_email(email)
-            if not user.is_active:
-                return JsonResponse(
-                    {"message": "User is inactive", "code": "user_inactive"},
-                    status=403
-                )
-            request.user = user
+            self.process_request(request)
         except SessionExpiredException as e:
             return JsonResponse(
                 {"message": str(e), "code": "session_expired"},
@@ -251,12 +237,38 @@ class CustomAuthMiddleware(AuthenticationMiddleware):
                 {"message": str(e), "code": "session_invalid"},
                 status=401
             )
+        except InactiveUserException as e:
+            return JsonResponse(
+                {"message": str(e), "code": "inactive_user"},
+                status=403
+            )
 
-    def process_response(
+        response = self.get_response(request)
+        return self.process_response(request, response)
+
+    def process_request(self, request: HttpRequest) -> None:
+        """
+        Process the request to authenticate the user based on the token
+
+        :param request: The request object
+        """
+        at, rt = self.verifier.get_tokens_from_request(request)
+        if at is None or rt is None:
+            request.user = AnonymousUser()
+            return
+        self.access_token = at
+        self.refresh_token = rt
+        email, at, rt = self.verifier.authenticate(at, rt)
+        user = self.serializer.find_by_email(email)
+        if not user.is_active:
+            raise InactiveUserException("User is inactive")
+        request.user = user
+
+    async def process_response(
         self,
         _: HttpRequest,
-        response: HttpResponse
-    ) -> HttpResponse:
+        response: Union[HttpResponseBase, Awaitable[HttpResponseBase]]
+    ) -> HttpResponseBase:
         """
         Process the response to set the access and refresh tokens as cookies.
         :param _: The request object (not used)
@@ -264,7 +276,11 @@ class CustomAuthMiddleware(AuthenticationMiddleware):
         :return: The response object with the cookies set
         """
         if self.access_token and self.refresh_token:
+            if isinstance(response, Awaitable):
+                response_result = await response
+            else:
+                response_result = response
             self.verifier.set_credentials_as_cookie(
-                response, self.access_token, self.refresh_token
+                response_result, self.access_token, self.refresh_token
             )
-        return response
+        return response_result
