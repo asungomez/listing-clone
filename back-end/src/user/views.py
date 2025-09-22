@@ -1,10 +1,9 @@
+from core.auth import TokenManager
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import redirect
 from django.views import View
-
-from core.auth import TokenManager
 
 from .serializers import UserSerializer
 
@@ -22,7 +21,7 @@ class LoginView(View):
         try:
             token_manager = TokenManager()
             at, rt = token_manager.get_tokens_from_provider(code)
-            email, at, rt = token_manager.authenticate(at, rt)
+            email, at = token_manager.authenticate(at, rt)
             try:
                 self.serializer.find_by_email(email)
             except User.DoesNotExist:

@@ -31,6 +31,16 @@
       "justMyCode": false,
       "cwd": "${workspaceFolder}/e2e-tests",
       "python": "${workspaceFolder}/e2e-tests/venv/bin/python"
+    },
+    {
+      "name": "Back-end test (current file)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": ["${file}"],
+      "justMyCode": false,
+      "cwd": "${workspaceFolder}",
+      "python": "${workspaceFolder}/back-end/venv/bin/python"
     }
   ]
 }

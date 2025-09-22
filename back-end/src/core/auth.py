@@ -1,5 +1,5 @@
 import json
-from typing import Awaitable, Optional, Tuple, Union
+from typing import Callable, Optional, Tuple
 
 import requests
 from core.crypto import Crypto
@@ -37,8 +37,8 @@ class TokenManager:
     def authenticate(
         self,
         access_token: str,
-        refresh_token: str
-    ) -> Tuple[str, str, str]:
+        refresh_token: Optional[str]
+    ) -> Tuple[str, str]:
         """
         Get the email from the token. If the access token is invalid or
         expired, it will use the refresh token to get a new access token.
@@ -65,7 +65,7 @@ class TokenManager:
             mock_email: str = decoded_token.get('sub')
             if not mock_email:
                 raise SessionInvalidException("Email not found in the token")
-            return mock_email, access_token, refresh_token
+            return mock_email, access_token
 
         url = f"{settings.OKTA['DOMAIN']}/userinfo"
         headers = {
@@ -73,7 +73,7 @@ class TokenManager:
             "Authorization": f"Bearer {access_token}"
         }
         response = requests.get(url, headers=headers)
-        if response.status_code == 401:
+        if response.status_code == 401 and refresh_token:
             access_token = self.get_access_token_from_refresh_token(
                 refresh_token
                 )
@@ -88,7 +88,7 @@ class TokenManager:
         email: str = userinfo.get("email")
         if not email:
             raise SessionInvalidException("Email not found in the token")
-        return email, access_token, refresh_token
+        return email, access_token
 
     def get_tokens_from_provider(self, code: str) -> Tuple[str, str]:
         """
@@ -137,7 +137,10 @@ class TokenManager:
                 header_parts = auth_header.split(" ")
                 if len(header_parts) >= 2 and header_parts[0] == "Bearer":
                     access_token = " ".join(header_parts[1:])
-                    refresh_token = 'placeholder_refresh_token'
+                    refresh_token = None
+                else:
+                    raise ValueError("Invalid authorization header")
+            return None, None
         else:
             crypto = Crypto()
             credentials_json = crypto.decrypt(encrypted_credentials)
@@ -210,15 +213,15 @@ class CustomAuthMiddleware(AuthenticationMiddleware):
     Custom authentication middleware to handle Okta authentication
     """
 
+    # Narrow get_response to a synchronous callable for type checking
+    get_response: Callable[[HttpRequest], HttpResponseBase]
+
     verifier = TokenManager()
     serializer = UserSerializer()
     access_token: Optional[str] = None
     refresh_token: Optional[str] = None
 
-    def __call__(self, request: HttpRequest) -> Union[
-        HttpResponseBase,
-        Awaitable[HttpResponseBase]
-    ]:
+    def __call__(self, request: HttpRequest) -> HttpResponseBase:
         """
         Call the middleware. This method is called by Django.
 
@@ -253,21 +256,21 @@ class CustomAuthMiddleware(AuthenticationMiddleware):
         :param request: The request object
         """
         at, rt = self.verifier.get_tokens_from_request(request)
-        if at is None or rt is None:
+        if at is None:
             request.user = AnonymousUser()
             return
         self.access_token = at
         self.refresh_token = rt
-        email, at, rt = self.verifier.authenticate(at, rt)
+        email, at = self.verifier.authenticate(at, rt)
         user = self.serializer.find_by_email(email)
         if not user.is_active:
             raise InactiveUserException("User is inactive")
         request.user = user
 
-    async def process_response(
+    def process_response(
         self,
         _: HttpRequest,
-        response: Union[HttpResponseBase, Awaitable[HttpResponseBase]]
+        response: HttpResponseBase
     ) -> HttpResponseBase:
         """
         Process the response to set the access and refresh tokens as cookies.
@@ -275,11 +278,8 @@ class CustomAuthMiddleware(AuthenticationMiddleware):
         :param response: The response object
         :return: The response object with the cookies set
         """
+        response_result = response
         if self.access_token and self.refresh_token:
-            if isinstance(response, Awaitable):
-                response_result = await response
-            else:
-                response_result = response
             self.verifier.set_credentials_as_cookie(
                 response_result, self.access_token, self.refresh_token
             )
