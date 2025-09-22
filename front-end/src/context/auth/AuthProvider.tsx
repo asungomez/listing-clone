@@ -36,7 +36,7 @@ export const AuthProvider: FC<AuthProviderProps> = ({ children }) => {
                   "Your credentials are invalid. Please log in again.";
               }
             } else if (error.response?.status === 403) {
-              if (errorCode === "user_inactive") {
+              if (errorCode === "inactive_user") {
                 errorMessage =
                   "Your account is inactive. Please contact support.";
               }
