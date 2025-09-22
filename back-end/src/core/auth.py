@@ -138,6 +138,7 @@ class TokenManager:
                 if len(header_parts) >= 2 and header_parts[0] == "Bearer":
                     access_token = " ".join(header_parts[1:])
                     refresh_token = None
+                    return access_token, refresh_token
                 else:
                     raise ValueError("Invalid authorization header")
             return None, None
@@ -244,6 +245,11 @@ class CustomAuthMiddleware(AuthenticationMiddleware):
             return JsonResponse(
                 {"message": str(e), "code": "inactive_user"},
                 status=403
+            )
+        except User.DoesNotExist:
+            return JsonResponse(
+                {"message": "User not found", "code": "user_not_found"},
+                status=401
             )
 
         response = self.get_response(request)
