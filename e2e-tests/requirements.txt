@@ -5,3 +5,9 @@ psycopg2==2.9.10
 testcontainers==4.9.1
 docker==7.1.0
 pre-commit==4.2.0
+flake8==7.1.2
+mypy==1.15.0
+types-psycopg2==2.9.21.20250516
+types-docker==7.1.0.20250705
+Faker==37.4.0
+sqlalchemy==2.0.41

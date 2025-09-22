@@ -1,11 +1,15 @@
 import logging
-import pytest
-from utils import Helper
-import docker
-from testcontainers.core.network import Network  # type: ignore
-from testcontainers.core.container import DockerContainer  # type: ignore
 import os
+from typing import Any, Dict
+
+import docker
+import pytest
+from testcontainers.core.container import DockerContainer  # type: ignore
+from testcontainers.core.network import Network  # type: ignore
 from testcontainers.core.waiting_utils import wait_for_logs  # type: ignore
+
+from .factories.user import UserFactory
+from .utils import Helper
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -14,14 +18,16 @@ logger = logging.getLogger(__name__)
 _front_end_url = None
 
 
-def set_base_url(url):
+def set_base_url(url: str) -> None:
     """Set the base URL for Playwright tests"""
     global _front_end_url
     _front_end_url = url
 
 
 @pytest.fixture(scope="session")
-def browser_context_args(browser_context_args):
+def browser_context_args(
+    browser_context_args: Dict[str, Any]
+) -> Dict[str, Any]:
     """Override the browser_context_args fixture to set the base URL"""
     global _front_end_url
     if _front_end_url:
@@ -123,6 +129,8 @@ def tests_helper(request: pytest.FixtureRequest) -> Helper:
         back_end_container = (
             DockerContainer(image=back_end_image.id)
             .with_exposed_ports(8000)
+            .with_env("ALLOWED_ORIGINS", "*")
+            .with_env("ALLOWED_HOSTS", "*")
             .with_env("DB_HOST", "db")
             .with_env("DB_NAME", "test")
             .with_env("DB_PASSWORD", "test")
@@ -154,15 +162,29 @@ def tests_helper(request: pytest.FixtureRequest) -> Helper:
             timeout=30,
         )
 
+        # Run the DB migrations
+        logger.info("Running migrations")
+        exit_code, output = back_end_container.exec(
+            "python /app/manage.py migrate",
+        )
+        if exit_code != 0:
+            logger.error(f"Migration failed: {output.decode()}")
+            raise Exception("Failed to apply migrations")
+        else:
+            logger.info("Migrations applied successfully")
+
         # Build the front-end image
         logger.info("Building front-end image")
-        back_end_url = "http://back-end:8000"
+        # Get the external back-end URL
+        back_end_host = back_end_container.get_container_host_ip()
+        back_end_port = back_end_container.get_exposed_port(8000)
+        back_end_url = f"http://{back_end_host}:{back_end_port}"
         login_redirect = f"{back_end_url}/users/login-callback"
         front_end_image, _ = docker_client.images.build(
             path="../front-end",
             buildargs={
                 "BUILD_ENV": build_env,
-                "OKTA_DOMAIN": "http://mockserver:1080/okta",
+                "OKTA_DOMAIN": "http://localhost:1080/okta",
                 "OKTA_CLIENT_ID": "client-id",
                 "OKTA_LOGIN_REDIRECT": login_redirect,
                 "API_URL": back_end_url
@@ -202,9 +224,36 @@ def tests_helper(request: pytest.FixtureRequest) -> Helper:
         helper = Helper(
             db_port=db_port,
             mockserver_url=mockserver_external_url,
-            back_end_url=back_end_url
+            back_end_url=back_end_url,
+            front_end_url=front_end_url
           )
         return helper
     except Exception as e:
         logger.error("Error starting containerized system: %s", str(e))
-        raise Exception("Failed to start containerized system")
+        raise Exception(f"Failed to start containerized system: {str(e)}")
+
+
+@pytest.fixture(autouse=True)
+def tear_down(request: pytest.FixtureRequest, tests_helper: Helper) -> None:
+    """
+    Tear down after each test.
+    This is used to clean up the database and remove the mocks
+    after each test.
+    """
+
+    def cleanup() -> None:
+        tests_helper.clean_up_db()
+
+    request.addfinalizer(cleanup)
+
+
+@pytest.fixture
+def user_factory() -> UserFactory:
+    """
+    Fixture that provides a UserFactory instance.
+
+    Usage:
+        def test_something(user_factory):
+            user = user_factory.generate(is_active=False)
+    """
+    return UserFactory()

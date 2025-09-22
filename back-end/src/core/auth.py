@@ -1,17 +1,32 @@
 import json
-from typing import Optional, Tuple
+from typing import Callable, Optional, Tuple
 
 import requests
+from core.crypto import Crypto
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.middleware import AuthenticationMiddleware
 from django.contrib.auth.models import AnonymousUser
-from django.http import HttpRequest, HttpResponse
-
-from core.crypto import Crypto
+from django.http import HttpRequest, JsonResponse
+from django.http.response import HttpResponseBase
 from user.serializers import UserSerializer
 
 User = get_user_model()
+
+
+class SessionExpiredException(Exception):
+    """Raised when the credentials are expired"""
+    pass
+
+
+class SessionInvalidException(Exception):
+    """Raised when the credentials are invalid"""
+    pass
+
+
+class InactiveUserException(Exception):
+    """Raised when the user is inactive"""
+    pass
 
 
 class TokenManager:
@@ -22,8 +37,8 @@ class TokenManager:
     def authenticate(
         self,
         access_token: str,
-        refresh_token: str
-    ) -> Tuple[str, str, str]:
+        refresh_token: Optional[str]
+    ) -> Tuple[str, str]:
         """
         Get the email from the token. If the access token is invalid or
         expired, it will use the refresh token to get a new access token.
@@ -36,11 +51,21 @@ class TokenManager:
         # In testing environments we don't use real Okta, so the token is
         # just a JSON string containing the claims
         if settings.MOCK_AUTH:
-            # Decode the token as a JSON string
             decoded_token = json.loads(access_token)
-            # Get the email from the decoded token
+            is_invalid: bool = decoded_token.get("is_invalid", False)
+            if is_invalid:
+                raise SessionInvalidException(
+                    "The credentials are invalid"
+                )
+            is_expired: bool = decoded_token.get("is_expired", False)
+            if is_expired:
+                raise SessionExpiredException(
+                    "The credentials are expired"
+                )
             mock_email: str = decoded_token.get('sub')
-            return mock_email, access_token, refresh_token
+            if not mock_email:
+                raise SessionInvalidException("Email not found in the token")
+            return mock_email, access_token
 
         url = f"{settings.OKTA['DOMAIN']}/userinfo"
         headers = {
@@ -48,18 +73,22 @@ class TokenManager:
             "Authorization": f"Bearer {access_token}"
         }
         response = requests.get(url, headers=headers)
-        if response.status_code == 401:
+        if response.status_code == 401 and refresh_token:
             access_token = self.get_access_token_from_refresh_token(
                 refresh_token
                 )
             headers["Authorization"] = f"Bearer {access_token}"
             response = requests.get(url, headers=headers)
+            if response.status_code == 401:
+                raise SessionExpiredException(
+                    "The credentials are expired"
+                )
         response.raise_for_status()
         userinfo = response.json()
         email: str = userinfo.get("email")
         if not email:
-            raise ValueError("Email not found in the token")
-        return email, access_token, refresh_token
+            raise SessionInvalidException("Email not found in the token")
+        return email, access_token
 
     def get_tokens_from_provider(self, code: str) -> Tuple[str, str]:
         """
@@ -108,7 +137,11 @@ class TokenManager:
                 header_parts = auth_header.split(" ")
                 if len(header_parts) >= 2 and header_parts[0] == "Bearer":
                     access_token = " ".join(header_parts[1:])
-                    refresh_token = 'placeholder_refresh_token'
+                    refresh_token = None
+                    return access_token, refresh_token
+                else:
+                    raise ValueError("Invalid authorization header")
+            return None, None
         else:
             crypto = Crypto()
             credentials_json = crypto.decrypt(encrypted_credentials)
@@ -144,9 +177,12 @@ class TokenManager:
             raise ValueError("Access token not found in the response")
         return access_token
 
-    def set_credentials_as_cookie(self, response: HttpResponse,
-                                  access_token: str,
-                                  refresh_token: str) -> None:
+    def set_credentials_as_cookie(
+        self,
+        response: HttpResponseBase,
+        access_token: str,
+        refresh_token: str
+    ) -> None:
         """
         Set the access and refresh tokens as a cookie in the response
         :param response: The response object
@@ -178,10 +214,46 @@ class CustomAuthMiddleware(AuthenticationMiddleware):
     Custom authentication middleware to handle Okta authentication
     """
 
+    # Narrow get_response to a synchronous callable for type checking
+    get_response: Callable[[HttpRequest], HttpResponseBase]
+
     verifier = TokenManager()
     serializer = UserSerializer()
     access_token: Optional[str] = None
     refresh_token: Optional[str] = None
+
+    def __call__(self, request: HttpRequest) -> HttpResponseBase:
+        """
+        Call the middleware. This method is called by Django.
+
+        :param request: The request object
+        :return: The response from the view or an error response
+        """
+        try:
+            self.process_request(request)
+        except SessionExpiredException as e:
+            return JsonResponse(
+                {"message": str(e), "code": "session_expired"},
+                status=401
+            )
+        except SessionInvalidException as e:
+            return JsonResponse(
+                {"message": str(e), "code": "session_invalid"},
+                status=401
+            )
+        except InactiveUserException as e:
+            return JsonResponse(
+                {"message": str(e), "code": "inactive_user"},
+                status=403
+            )
+        except User.DoesNotExist:
+            return JsonResponse(
+                {"message": "User not found", "code": "user_not_found"},
+                status=401
+            )
+
+        response = self.get_response(request)
+        return self.process_response(request, response)
 
     def process_request(self, request: HttpRequest) -> None:
         """
@@ -189,33 +261,32 @@ class CustomAuthMiddleware(AuthenticationMiddleware):
 
         :param request: The request object
         """
-        try:
-            at, rt = self.verifier.get_tokens_from_request(request)
-            if at is None or rt is None:
-                request.user = AnonymousUser()
-                return
-            self.access_token = at
-            self.refresh_token = rt
-            email, at, rt = self.verifier.authenticate(at, rt)
-            user = self.serializer.find_by_email(email)
-            request.user = user
-        except Exception as e:
-            print(f"Authentication failed: {str(e)}")
+        at, rt = self.verifier.get_tokens_from_request(request)
+        if at is None:
             request.user = AnonymousUser()
+            return
+        self.access_token = at
+        self.refresh_token = rt
+        email, at = self.verifier.authenticate(at, rt)
+        user = self.serializer.find_by_email(email)
+        if not user.is_active:
+            raise InactiveUserException("User is inactive")
+        request.user = user
 
     def process_response(
         self,
         _: HttpRequest,
-        response: HttpResponse
-    ) -> HttpResponse:
+        response: HttpResponseBase
+    ) -> HttpResponseBase:
         """
         Process the response to set the access and refresh tokens as cookies.
         :param _: The request object (not used)
         :param response: The response object
         :return: The response object with the cookies set
         """
+        response_result = response
         if self.access_token and self.refresh_token:
             self.verifier.set_credentials_as_cookie(
-                response, self.access_token, self.refresh_token
+                response_result, self.access_token, self.refresh_token
             )
-        return response
+        return response_result

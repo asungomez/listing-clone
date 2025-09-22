@@ -32,6 +32,7 @@ type AlertProps = {
   children?: ReactNode;
   dismissable?: boolean;
   title?: string;
+  onDismiss?: () => void;
 };
 
 export const Alert: FC<AlertProps> = ({
@@ -40,6 +41,7 @@ export const Alert: FC<AlertProps> = ({
   children,
   dismissable = false,
   title: titleOverride,
+  onDismiss,
 }) => {
   const [show, setShow] = useState(true);
   const alertColor = ALERT_COLOR_MAP[color];
@@ -51,6 +53,7 @@ export const Alert: FC<AlertProps> = ({
 
   const handleDismiss = () => {
     setShow(false);
+    onDismiss?.();
   };
 
   return show ? (

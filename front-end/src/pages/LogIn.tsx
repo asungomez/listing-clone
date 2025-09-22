@@ -1,15 +1,35 @@
-import { FC, useState } from "react";
+import { FC, useMemo, useState } from "react";
 import { useAuth } from "../context/auth/AuthContext";
 import { Button } from "../atoms/Button/Button";
+import { useSearchParams } from "react-router";
+import { Alert } from "../atoms/Alert/Alert";
 
 export const LogInPage: FC = () => {
   const [loading, setLoading] = useState(false);
   const { redirectToLogin } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const errorMessage = useMemo(() => {
+    const error = searchParams.get("error_message");
+    if (error) {
+      return decodeURIComponent(error);
+    }
+    return undefined;
+  }, [searchParams]);
 
   const loginClickHandler = async () => {
     setLoading(true);
     await redirectToLogin();
   };
+
+  const dismissErrorMessageHandler = () => {
+    setSearchParams((prev) => {
+      const newParams = new URLSearchParams(prev);
+      newParams.delete("error_message");
+      return newParams;
+    });
+  };
+
   return (
     <section className="bg-gray-900 min-h-screen flex items-center">
       <div className="gap-8 items-center py-8 px-4 mx-auto max-w-screen-xl xl:gap-16 md:grid md:grid-cols-2 sm:py-16 lg:px-6">
@@ -22,6 +42,14 @@ export const LogInPage: FC = () => {
           <h2 className="mb-4 text-4xl tracking-tight font-extrabold text-white">
             Log in to this wonderfully useful site
           </h2>
+          {errorMessage && (
+            <Alert
+              color="warning"
+              dismissable
+              title={errorMessage}
+              onDismiss={dismissErrorMessageHandler}
+            />
+          )}
           <p className="mb-6 font-light md:text-lg text-gray-400">
             Welcome back! We're excited to see you again! Please log in to your
             account. If you don't have an account, you can create one for free.

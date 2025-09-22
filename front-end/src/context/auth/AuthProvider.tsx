@@ -5,6 +5,7 @@ import { Spinner } from "../../atoms/Spinner/Spinner";
 import { MessagePage } from "../../features/MessagePage/MessagePage";
 import { User } from "../../models/user";
 import { useNavigate } from "react-router";
+import { AxiosError } from "axios";
 
 type AuthProviderProps = {
   children: ReactNode;
@@ -24,7 +25,26 @@ export const AuthProvider: FC<AuthProviderProps> = ({ children }) => {
           navigate("/my-listings");
         })
         .catch((error) => {
-          console.error(error);
+          let errorMessage: string | undefined = undefined;
+          if (error instanceof AxiosError) {
+            const errorCode = error.response?.data?.code;
+            if (error.response?.status === 401) {
+              if (errorCode === "session_expired") {
+                errorMessage = "Your session has expired. Please log in again.";
+              } else if (errorCode === "session_invalid") {
+                errorMessage =
+                  "Your credentials are invalid. Please log in again.";
+              }
+            } else if (error.response?.status === 403) {
+              if (errorCode === "inactive_user") {
+                errorMessage =
+                  "Your account is inactive. Please contact support.";
+              }
+            }
+          }
+          if (errorMessage) {
+            navigate("/?error_message=" + encodeURIComponent(errorMessage));
+          }
           setAuthStatus("unauthenticated");
         });
     }
