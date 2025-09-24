@@ -1,7 +1,9 @@
-from typing import Any, Mapping, Optional, Sequence
+import json
+from typing import Any, Dict, Literal, Mapping, Optional, Sequence, Tuple
 
 import psycopg2
 import requests
+from cryptography.fernet import Fernet
 
 
 class Helper:
@@ -13,12 +15,14 @@ class Helper:
     api_url: Optional[str] = None
     mockserver_url: Optional[str] = None
     db_connection: Optional[psycopg2.extensions.connection] = None
+    encryption_key: Optional[str] = None
 
     def __init__(
             self,
             api_url: str,
             mockserver_url: str,
             db_port: int,
+            encryption_key: Optional[str] = None,
             ):
         """
         Initialize the Helper class.
@@ -26,6 +30,7 @@ class Helper:
         :param api_url: The URL of the API
         :param mockserver_url: The URL of the MockServer
         :param db_port: The port of the database
+        :param encryption_key: The encryption key to use for the crypto
         """
         self.api_url = api_url
         self.mockserver_url = mockserver_url
@@ -36,6 +41,41 @@ class Helper:
             password="test",
             port=db_port
         )
+        self.encryption_key = encryption_key
+
+    def authenticate(
+        self,
+        email: str,
+        method: Literal["header", "cookie"] = "cookie"
+    ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+        """
+        Authenticate a user in a request.
+
+        :param email: The email of the user to authenticate as
+        :param method: The method to authenticate with. The options are:
+        - "header": Authenticate with a header
+        - "cookie": Authenticate with a cookie
+        :return: The headers and the cookies
+        """
+        self.mock_okta_userinfo_response(
+            response_body={
+                "email": email
+            }
+        )
+        if method == "header":
+            return {
+                "Authorization": "Bearer fake-access-token"
+            }, {}
+        else:
+            credentials_map = {
+                "access_token": "fake-access-token",
+                "refresh_token": "fake-refresh-token",
+            }
+            credentials = json.dumps(credentials_map)
+            encrypted_credentials = self.encrypt(credentials)
+            return {}, {
+                "credentials": encrypted_credentials
+            }
 
     def clean_up_db(self) -> None:
         """
@@ -55,6 +95,15 @@ class Helper:
         """
         url = f"{self.mockserver_url}/mockserver/reset"
         requests.put(url)
+
+    def encrypt(self, value: str) -> str:
+        """
+        Encrypt a value using the same encryption key as the one used
+        in the API.
+        """
+        cipher = Fernet(self.encryption_key.encode())
+        encrypted = cipher.encrypt(value.encode())
+        return encrypted.decode()
 
     def find_user_by_email(self, email: str) -> Optional[dict[str, Any]]:
         """
@@ -91,28 +140,38 @@ class Helper:
     def get_request(
             self,
             path: str,
-            authenticated_as: Optional[str] = None
+            authenticated_as: Optional[str] = None,
+            authentication_method: Literal["header", "cookie"] = "cookie"
             ) -> requests.Response:
         """
         Make a request to the API.
 
         :param path: The path to request
         :param authenticated_as: The email of the user to authenticate as
-
+        :param authentication_method: The method to authenticate with.
+        The options are:
+        - "header": Authenticate with a header
+        - "cookie": Authenticate with a cookie
         :return: The response object
         """
         url = f"{self.api_url}{path}"
         headers = {
             "Accept": "application/json",
         }
+        cookies = {}
         if authenticated_as is not None:
-            self.mock_okta_userinfo_response(
-                response_body={
-                    "email": authenticated_as
-                }
+            headers, cookies = self.authenticate(
+                authenticated_as,
+                authentication_method
             )
-            headers["Authorization"] = "Bearer fake-access-token"
-        response = requests.get(url, allow_redirects=False, headers=headers)
+            headers.update(headers)
+            cookies.update(cookies)
+        response = requests.get(
+            url,
+            allow_redirects=False,
+            headers=headers,
+            cookies=cookies
+            )
         return response
 
     def insert_user(self, user: dict[str, Any]) -> None:
