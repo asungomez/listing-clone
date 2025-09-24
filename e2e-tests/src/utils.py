@@ -1,9 +1,9 @@
 import datetime
-import json
 import logging
 from contextlib import contextmanager
 from typing import Any, Generator
 
+import requests
 from playwright.sync_api import Page
 from sqlalchemy import MetaData, Table, create_engine, inspect, text
 from sqlalchemy.engine import Engine
@@ -57,7 +57,7 @@ class Helper:
         self,
         page: Page,
         email: str,
-        **token_extras: Any
+        **auth_config: Any
     ) -> Generator[None, None, None]:
         """
         Context manager for authentication that automatically cleans up.
@@ -69,22 +69,37 @@ class Helper:
             is_expired=True
         ):
             page.goto("/")
-            # Test with authentication
+        # Test with authentication
         # Headers are automatically cleared when exiting the context
 
         :param page: The Playwright Page object to set headers on.
         :param email: The email address to use for authentication.
-        :param token_extras: Additional key-value pairs to include in
-        the token.
+        :param auth_config: Additional key-value pairs to configure the
+        authentication.
         - is_expired: If True, simulates an expired session.
         - is_invalid: If True, simulates an invalid session.
         :return: A context manager that sets the authentication headers
         """
-        token_payload = {"sub": email, **token_extras}
-        token_json = json.dumps(token_payload)
         page.set_extra_http_headers({
-            "Authorization": f"Bearer {token_json}",
+            "Authorization": "Bearer fake-access-token",
         })
+        is_expired = auth_config.get("is_expired", False)
+        is_invalid = auth_config.get("is_invalid", False)
+        if is_expired:
+            self.mock_okta_userinfo_response(
+                response_body={"error": "expired_token"},
+                response_status=401,
+            )
+        elif is_invalid:
+            self.mock_okta_userinfo_response(
+                response_body={"error": "invalid_response"},
+                response_status=200,
+            )
+        else:
+            self.mock_okta_userinfo_response(
+                response_body={"email": email},
+                response_status=200,
+            )
         try:
             yield
         finally:
@@ -116,6 +131,13 @@ class Helper:
 
             # Re-enable foreign key constraints
             connection.execute(text("SET CONSTRAINTS ALL IMMEDIATE"))
+
+    def clean_up_mocks(self) -> None:
+        """
+        Clean up the mocks in the MockServer.
+        """
+        url = f"{self.mockserver_url}/mockserver/reset"
+        requests.put(url)
 
     def db_table(self, table_name: str) -> Table:
         """
@@ -152,3 +174,56 @@ class Helper:
             result = connection.execute(insert_stmt)
             id = result.inserted_primary_key[0]
             user.id = id
+
+    def mock_okta_userinfo_response(
+            self,
+            response_body: Any,
+            response_status: int = 200
+            ) -> None:
+        """
+        Mock Okta's userinfo endpoint.
+
+        :param response_body: The response body to return
+        :param response_status: The response status code to return
+        """
+        self.mock_response(
+            request_path="/okta/userinfo",
+            request_method="GET",
+            response_body=response_body,
+            response_status=response_status,
+        )
+
+    def mock_response(
+            self,
+            request_path: str,
+            request_method: str = "GET",
+            response_body: Any = {},
+            response_status: int = 200,
+            ) -> None:
+        """
+        Mock a response from the Mockserver
+
+        :param request_path: The path to match
+        :param request_method: The method to match
+        :param response_body: The response body to return
+        :param response_status: The response status code
+        """
+
+        url = f"{self.mockserver_url}/mockserver/expectation"
+        mock = {
+            "httpRequest": {
+                "path": request_path,
+                "method": request_method,
+            },
+            "httpResponse": {
+                "body": response_body,
+                "statusCode": response_status,
+            },
+        }
+
+        # Send a PUT request to the MockServer to create the expectation
+        requests.put(
+            url,
+            json=mock,
+            headers={"Content-Type": "application/json"},
+        )

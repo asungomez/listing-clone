@@ -54,13 +54,18 @@ class TokenManager:
             "Authorization": f"Bearer {access_token}"
         }
         response = requests.get(url, headers=headers)
-        if response.status_code == 401 and refresh_token:
-            access_token = self.get_access_token_from_refresh_token(
-                refresh_token
-                )
-            headers["Authorization"] = f"Bearer {access_token}"
-            response = requests.get(url, headers=headers)
-            if response.status_code == 401:
+        if response.status_code == 401:
+            if refresh_token:
+                access_token = self.get_access_token_from_refresh_token(
+                    refresh_token
+                    )
+                headers["Authorization"] = f"Bearer {access_token}"
+                response = requests.get(url, headers=headers)
+                if response.status_code == 401:
+                    raise SessionExpiredException(
+                        "The credentials are expired"
+                    )
+            else:
                 raise SessionExpiredException(
                     "The credentials are expired"
                 )
@@ -152,6 +157,10 @@ class TokenManager:
             "client_secret": settings.OKTA["CLIENT_SECRET"]
         }
         response = requests.post(url, headers=headers, data=payload)
+        if response.status_code == 401:
+            raise SessionExpiredException(
+                "The credentials are expired"
+            )
         response.raise_for_status()
         access_token: Optional[str] = response.json().get("access_token")
         if not access_token:

@@ -243,6 +243,7 @@ def tear_down(request: pytest.FixtureRequest, tests_helper: Helper) -> None:
 
     def cleanup() -> None:
         tests_helper.clean_up_db()
+        tests_helper.clean_up_mocks()
 
     request.addfinalizer(cleanup)
 
