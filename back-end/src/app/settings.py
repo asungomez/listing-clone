@@ -45,8 +45,6 @@ env = environ.Env(
     ENCRYPTION_KEY=(str, None),
     # Frontend URL for the application
     FRONT_END_URL=(str, None),
-    # Allow mock authentication (used only during testing)
-    MOCK_AUTH=(bool, False),
     # Okta client ID
     OKTA_CLIENT_ID=(str, None),
     # Okta client secret
@@ -174,7 +172,6 @@ OKTA = {
     "CLIENT_SECRET": env.str("OKTA_CLIENT_SECRET"),
     "LOGIN_REDIRECT": env.str("OKTA_LOGIN_REDIRECT")
 }
-MOCK_AUTH = env.bool("MOCK_AUTH")
 
 # Front-end config
 FRONT_END_URL = env.str("FRONT_END_URL")

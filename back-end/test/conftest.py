@@ -94,6 +94,7 @@ def tests_helper(request: pytest.FixtureRequest) -> Helper:
         # Spin up the API container
         logger.info("Starting container")
         mockserver_url = "http://mockserver:1080"
+        encryption_key = "HqvJK8Ur9q_ZFZlnM-1TOKu7sK4HidccP6NnmMdCEVo="
         api_container = (
             DockerContainer(image=image.id)
             .with_exposed_ports(8000)
@@ -105,7 +106,6 @@ def tests_helper(request: pytest.FixtureRequest) -> Helper:
             .with_env("DEBUG", "True")
             .with_env("DJANGO_SECRET_KEY", "test")
             .with_env("FRONT_END_URL", static.FRONT_END_URL)
-            .with_env("MOCK_AUTH", "True")
             .with_env("OKTA_CLIENT_ID", "client-id")
             .with_env("OKTA_CLIENT_SECRET", "client-secret")
             .with_env("OKTA_DOMAIN", f"{mockserver_url}/okta")
@@ -113,7 +113,7 @@ def tests_helper(request: pytest.FixtureRequest) -> Helper:
             .with_env("USE_HTTPS", False)
             .with_env(
                 "ENCRYPTION_KEY",
-                "HqvJK8Ur9q_ZFZlnM-1TOKu7sK4HidccP6NnmMdCEVo="
+                encryption_key
                 )
             .with_network(network)
             .start()
@@ -156,6 +156,7 @@ def tests_helper(request: pytest.FixtureRequest) -> Helper:
             api_url=api_url,
             mockserver_url=mockserver_external_url,
             db_port=db_port,
+            encryption_key=encryption_key,
         )
         return helper
     except Exception as e:

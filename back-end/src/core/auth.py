@@ -48,41 +48,31 @@ class TokenManager:
         :return: The email address from the token, the access token, and the
         refresh token
         """
-        # In testing environments we don't use real Okta, so the token is
-        # just a JSON string containing the claims
-        if settings.MOCK_AUTH:
-            decoded_token = json.loads(access_token)
-            is_invalid: bool = decoded_token.get("is_invalid", False)
-            if is_invalid:
-                raise SessionInvalidException(
-                    "The credentials are invalid"
-                )
-            is_expired: bool = decoded_token.get("is_expired", False)
-            if is_expired:
-                raise SessionExpiredException(
-                    "The credentials are expired"
-                )
-            mock_email: str = decoded_token.get('sub')
-            if not mock_email:
-                raise SessionInvalidException("Email not found in the token")
-            return mock_email, access_token
-
         url = f"{settings.OKTA['DOMAIN']}/userinfo"
         headers = {
             "Accept": "application/json",
             "Authorization": f"Bearer {access_token}"
         }
         response = requests.get(url, headers=headers)
-        if response.status_code == 401 and refresh_token:
-            access_token = self.get_access_token_from_refresh_token(
-                refresh_token
-                )
-            headers["Authorization"] = f"Bearer {access_token}"
-            response = requests.get(url, headers=headers)
-            if response.status_code == 401:
+        if response.status_code == 401:
+            if refresh_token:
+                access_token = self.get_access_token_from_refresh_token(
+                    refresh_token
+                    )
+                headers["Authorization"] = f"Bearer {access_token}"
+                response = requests.get(url, headers=headers)
+                if response.status_code == 401:
+                    raise SessionExpiredException(
+                        "The credentials are expired"
+                    )
+            else:
                 raise SessionExpiredException(
                     "The credentials are expired"
                 )
+        elif response.status_code/100 == 4:
+            raise SessionInvalidException(
+                "The credentials are invalid"
+            )
         response.raise_for_status()
         userinfo = response.json()
         email: str = userinfo.get("email")
@@ -171,11 +161,34 @@ class TokenManager:
             "client_secret": settings.OKTA["CLIENT_SECRET"]
         }
         response = requests.post(url, headers=headers, data=payload)
+        if response.status_code == 401:
+            raise SessionExpiredException(
+                "The credentials are expired"
+            )
+        elif response.status_code/100 == 4:
+            raise SessionInvalidException(
+                "The credentials are invalid"
+            )
         response.raise_for_status()
         access_token: Optional[str] = response.json().get("access_token")
         if not access_token:
             raise ValueError("Access token not found in the response")
         return access_token
+
+    def remove_credentials_from_cookies(
+        self,
+        response: HttpResponseBase
+    ) -> None:
+        """
+        Remove the credentials from the cookies
+        :param response: The response object
+        """
+        response.delete_cookie(
+            key=settings.AUTH_COOKIE_CONFIG["NAME"],
+            domain=settings.AUTH_COOKIE_CONFIG["DOMAIN"],
+            path=settings.AUTH_COOKIE_CONFIG["PATH"],
+            samesite=settings.AUTH_COOKIE_CONFIG["SAMESITE"],
+        )
 
     def set_credentials_as_cookie(
         self,
@@ -251,6 +264,11 @@ class CustomAuthMiddleware(AuthenticationMiddleware):
                 {"message": "User not found", "code": "user_not_found"},
                 status=401
             )
+        except ValueError as e:
+            return JsonResponse(
+                {"message": str(e), "code": "invalid_token"},
+                status=401
+            )
 
         response = self.get_response(request)
         return self.process_response(request, response)
@@ -279,14 +297,18 @@ class CustomAuthMiddleware(AuthenticationMiddleware):
         response: HttpResponseBase
     ) -> HttpResponseBase:
         """
-        Process the response to set the access and refresh tokens as cookies.
+        Process the response to set the access and refresh tokens as cookies
+        or remove them from the cookies.
+
         :param _: The request object (not used)
         :param response: The response object
-        :return: The response object with the cookies set
+        :return: The response object with the cookies set/removed
         """
         response_result = response
         if self.access_token and self.refresh_token:
             self.verifier.set_credentials_as_cookie(
                 response_result, self.access_token, self.refresh_token
             )
+        else:
+            self.verifier.remove_credentials_from_cookies(response_result)
         return response_result

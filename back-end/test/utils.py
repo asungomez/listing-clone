@@ -1,8 +1,9 @@
 import json
-from typing import Any, Mapping, Optional, Sequence
+from typing import Any, Dict, Literal, Mapping, Optional, Sequence, Tuple
 
 import psycopg2
 import requests
+from cryptography.fernet import Fernet
 
 
 class Helper:
@@ -11,15 +12,17 @@ class Helper:
     mocks, etc.
     """
 
-    api_url: Optional[str] = None
-    mockserver_url: Optional[str] = None
-    db_connection: Optional[psycopg2.extensions.connection] = None
+    api_url: str
+    mockserver_url: str
+    db_connection: psycopg2.extensions.connection
+    encryption_key: str
 
     def __init__(
             self,
             api_url: str,
             mockserver_url: str,
             db_port: int,
+            encryption_key: str,
             ):
         """
         Initialize the Helper class.
@@ -27,6 +30,7 @@ class Helper:
         :param api_url: The URL of the API
         :param mockserver_url: The URL of the MockServer
         :param db_port: The port of the database
+        :param encryption_key: The encryption key to use for the crypto
         """
         self.api_url = api_url
         self.mockserver_url = mockserver_url
@@ -37,6 +41,45 @@ class Helper:
             password="test",
             port=db_port
         )
+        self.encryption_key = encryption_key
+
+    def authenticate(
+        self,
+        email: str,
+        method: Literal["header", "cookie"] = "cookie",
+        omit_auth_mocking: bool = False,
+    ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+        """
+        Authenticate a user in a request.
+
+        :param email: The email of the user to authenticate as
+        :param method: The method to authenticate with. The options are:
+        - "header": Authenticate with a header
+        - "cookie": Authenticate with a cookie
+        :param omit_auth_mocking: If True, the authentication mocking will be
+        omitted
+        :return: The headers and the cookies
+        """
+        if not omit_auth_mocking:
+            self.mock_okta_userinfo_response(
+                response_body={
+                    "email": email
+                }
+            )
+        if method == "header":
+            return {
+                "Authorization": "Bearer fake-access-token"
+            }, {}
+        else:
+            credentials_map = {
+                "access_token": "fake-access-token",
+                "refresh_token": "fake-refresh-token",
+            }
+            credentials = json.dumps(credentials_map)
+            encrypted_credentials = self.encrypt(credentials)
+            return {}, {
+                "credentials": encrypted_credentials
+            }
 
     def clean_up_db(self) -> None:
         """
@@ -56,6 +99,15 @@ class Helper:
         """
         url = f"{self.mockserver_url}/mockserver/reset"
         requests.put(url)
+
+    def encrypt(self, value: str) -> str:
+        """
+        Encrypt a value using the same encryption key as the one used
+        in the API.
+        """
+        cipher = Fernet(self.encryption_key.encode())
+        encrypted = cipher.encrypt(value.encode())
+        return encrypted.decode()
 
     def find_user_by_email(self, email: str) -> Optional[dict[str, Any]]:
         """
@@ -92,26 +144,42 @@ class Helper:
     def get_request(
             self,
             path: str,
-            authenticated_as: Optional[str] = None
+            authenticated_as: Optional[str] = None,
+            authentication_method: Literal["header", "cookie"] = "cookie",
+            omit_auth_mocking: bool = False,
             ) -> requests.Response:
         """
         Make a request to the API.
 
         :param path: The path to request
         :param authenticated_as: The email of the user to authenticate as
-
+        :param authentication_method: The method to authenticate with.
+        The options are:
+        - "header": Authenticate with a header
+        - "cookie": Authenticate with a cookie
+        :param omit_auth_mocking: If True, the authentication mocking will be
+        omitted
         :return: The response object
         """
         url = f"{self.api_url}{path}"
         headers = {
             "Accept": "application/json",
         }
+        cookies: Dict[str, Any] = {}
         if authenticated_as is not None:
-            access_token = json.dumps({
-                "sub": authenticated_as
-            })
-            headers["Authorization"] = f"Bearer {access_token}"
-        response = requests.get(url, allow_redirects=False, headers=headers)
+            headers, cookies = self.authenticate(
+                authenticated_as,
+                authentication_method,
+                omit_auth_mocking
+            )
+            headers.update(headers)
+            cookies.update(cookies)
+        response = requests.get(
+            url,
+            allow_redirects=False,
+            headers=headers,
+            cookies=cookies
+            )
         return response
 
     def insert_user(self, user: dict[str, Any]) -> None:
@@ -155,13 +223,18 @@ class Helper:
     def mock_okta_token_response(
             self,
             response_body: Any,
-            response_status: int = 200
+            response_status: int = 200,
+            grant_type: Literal[
+                "authorization_code",
+                "refresh_token"
+                ] = "authorization_code"
             ) -> None:
         """
         Mock Okta's token endpoint.
 
         :param response_body: The response body to return
         :param response_status: The response status code to return
+        :param grant_type: The grant type to match
         """
 
         self.mock_response(
@@ -169,6 +242,31 @@ class Helper:
             request_method="POST",
             response_body=response_body,
             response_status=response_status,
+            request_body={
+                "grant_type": grant_type
+            },
+        )
+
+    def mock_okta_userinfo_response(
+            self,
+            response_body: Any,
+            response_status: int = 200,
+            times: Optional[int] = None
+            ) -> None:
+        """
+        Mock Okta's userinfo endpoint.
+
+        :param response_body: The response body to return
+        :param response_status: The response status code to return
+        :param times: The number of times to match the request.
+        None means infinite
+        """
+        self.mock_response(
+            request_path="/okta/userinfo",
+            request_method="GET",
+            response_body=response_body,
+            response_status=response_status,
+            times=times,
         )
 
     def mock_response(
@@ -177,6 +275,8 @@ class Helper:
             request_method: str = "GET",
             response_body: Any = {},
             response_status: int = 200,
+            request_body: Any = None,
+            times: Optional[int] = None
             ) -> None:
         """
         Mock a response from the Mockserver
@@ -185,6 +285,9 @@ class Helper:
         :param request_method: The method to match
         :param response_body: The response body to return
         :param response_status: The response status code
+        :param request_body: The request body to match
+        :param times: The number of times to match the request.
+        None means infinite
         """
 
         url = f"{self.mockserver_url}/mockserver/expectation"
@@ -198,6 +301,19 @@ class Helper:
                 "statusCode": response_status,
             },
         }
+
+        if request_body:
+            mock["httpRequest"]["body"] = {
+                "type": "JSON",
+                "json": request_body,
+                "matchType": "ONLY_MATCHING_FIELDS"
+            }
+
+        if times:
+            mock["times"] = {
+                "remainingTimes": times,
+                "unlimited": False,
+            }
 
         # Send a PUT request to the MockServer to create the expectation
         requests.put(
