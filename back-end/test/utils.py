@@ -12,17 +12,17 @@ class Helper:
     mocks, etc.
     """
 
-    api_url: Optional[str] = None
-    mockserver_url: Optional[str] = None
-    db_connection: Optional[psycopg2.extensions.connection] = None
-    encryption_key: Optional[str] = None
+    api_url: str
+    mockserver_url: str
+    db_connection: psycopg2.extensions.connection
+    encryption_key: str
 
     def __init__(
             self,
             api_url: str,
             mockserver_url: str,
             db_port: int,
-            encryption_key: Optional[str] = None,
+            encryption_key: str,
             ):
         """
         Initialize the Helper class.
@@ -158,7 +158,7 @@ class Helper:
         headers = {
             "Accept": "application/json",
         }
-        cookies = {}
+        cookies: Dict[str, Any] = {}
         if authenticated_as is not None:
             headers, cookies = self.authenticate(
                 authenticated_as,
