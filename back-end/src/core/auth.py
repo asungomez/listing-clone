@@ -175,6 +175,21 @@ class TokenManager:
             raise ValueError("Access token not found in the response")
         return access_token
 
+    def remove_credentials_from_cookies(
+        self,
+        response: HttpResponseBase
+    ) -> None:
+        """
+        Remove the credentials from the cookies
+        :param response: The response object
+        """
+        response.delete_cookie(
+            key=settings.AUTH_COOKIE_CONFIG["NAME"],
+            domain=settings.AUTH_COOKIE_CONFIG["DOMAIN"],
+            path=settings.AUTH_COOKIE_CONFIG["PATH"],
+            samesite=settings.AUTH_COOKIE_CONFIG["SAMESITE"],
+        )
+
     def set_credentials_as_cookie(
         self,
         response: HttpResponseBase,
@@ -282,14 +297,18 @@ class CustomAuthMiddleware(AuthenticationMiddleware):
         response: HttpResponseBase
     ) -> HttpResponseBase:
         """
-        Process the response to set the access and refresh tokens as cookies.
+        Process the response to set the access and refresh tokens as cookies
+        or remove them from the cookies.
+
         :param _: The request object (not used)
         :param response: The response object
-        :return: The response object with the cookies set
+        :return: The response object with the cookies set/removed
         """
         response_result = response
         if self.access_token and self.refresh_token:
             self.verifier.set_credentials_as_cookie(
                 response_result, self.access_token, self.refresh_token
             )
+        else:
+            self.verifier.remove_credentials_from_cookies(response_result)
         return response_result
