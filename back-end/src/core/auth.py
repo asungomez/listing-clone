@@ -69,6 +69,10 @@ class TokenManager:
                 raise SessionExpiredException(
                     "The credentials are expired"
                 )
+        elif response.status_code/100 == 4:
+            raise SessionInvalidException(
+                "The credentials are invalid"
+            )
         response.raise_for_status()
         userinfo = response.json()
         email: str = userinfo.get("email")
@@ -161,6 +165,10 @@ class TokenManager:
             raise SessionExpiredException(
                 "The credentials are expired"
             )
+        elif response.status_code/100 == 4:
+            raise SessionInvalidException(
+                "The credentials are invalid"
+            )
         response.raise_for_status()
         access_token: Optional[str] = response.json().get("access_token")
         if not access_token:
@@ -239,6 +247,11 @@ class CustomAuthMiddleware(AuthenticationMiddleware):
         except User.DoesNotExist:
             return JsonResponse(
                 {"message": "User not found", "code": "user_not_found"},
+                status=401
+            )
+        except ValueError as e:
+            return JsonResponse(
+                {"message": str(e), "code": "invalid_token"},
                 status=401
             )
 

@@ -46,7 +46,8 @@ class Helper:
     def authenticate(
         self,
         email: str,
-        method: Literal["header", "cookie"] = "cookie"
+        method: Literal["header", "cookie"] = "cookie",
+        omit_auth_mocking: bool = False,
     ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         """
         Authenticate a user in a request.
@@ -55,13 +56,16 @@ class Helper:
         :param method: The method to authenticate with. The options are:
         - "header": Authenticate with a header
         - "cookie": Authenticate with a cookie
+        :param omit_auth_mocking: If True, the authentication mocking will be
+        omitted
         :return: The headers and the cookies
         """
-        self.mock_okta_userinfo_response(
-            response_body={
-                "email": email
-            }
-        )
+        if not omit_auth_mocking:
+            self.mock_okta_userinfo_response(
+                response_body={
+                    "email": email
+                }
+            )
         if method == "header":
             return {
                 "Authorization": "Bearer fake-access-token"
@@ -141,7 +145,8 @@ class Helper:
             self,
             path: str,
             authenticated_as: Optional[str] = None,
-            authentication_method: Literal["header", "cookie"] = "cookie"
+            authentication_method: Literal["header", "cookie"] = "cookie",
+            omit_auth_mocking: bool = False,
             ) -> requests.Response:
         """
         Make a request to the API.
@@ -152,6 +157,8 @@ class Helper:
         The options are:
         - "header": Authenticate with a header
         - "cookie": Authenticate with a cookie
+        :param omit_auth_mocking: If True, the authentication mocking will be
+        omitted
         :return: The response object
         """
         url = f"{self.api_url}{path}"
@@ -162,7 +169,8 @@ class Helper:
         if authenticated_as is not None:
             headers, cookies = self.authenticate(
                 authenticated_as,
-                authentication_method
+                authentication_method,
+                omit_auth_mocking
             )
             headers.update(headers)
             cookies.update(cookies)
@@ -215,13 +223,18 @@ class Helper:
     def mock_okta_token_response(
             self,
             response_body: Any,
-            response_status: int = 200
+            response_status: int = 200,
+            grant_type: Literal[
+                "authorization_code",
+                "refresh_token"
+                ] = "authorization_code"
             ) -> None:
         """
         Mock Okta's token endpoint.
 
         :param response_body: The response body to return
         :param response_status: The response status code to return
+        :param grant_type: The grant type to match
         """
 
         self.mock_response(
@@ -229,24 +242,31 @@ class Helper:
             request_method="POST",
             response_body=response_body,
             response_status=response_status,
+            request_body={
+                "grant_type": grant_type
+            },
         )
 
     def mock_okta_userinfo_response(
             self,
             response_body: Any,
-            response_status: int = 200
+            response_status: int = 200,
+            times: Optional[int] = None
             ) -> None:
         """
         Mock Okta's userinfo endpoint.
 
         :param response_body: The response body to return
         :param response_status: The response status code to return
+        :param times: The number of times to match the request.
+        None means infinite
         """
         self.mock_response(
             request_path="/okta/userinfo",
             request_method="GET",
             response_body=response_body,
             response_status=response_status,
+            times=times,
         )
 
     def mock_response(
@@ -255,6 +275,8 @@ class Helper:
             request_method: str = "GET",
             response_body: Any = {},
             response_status: int = 200,
+            request_body: Any = None,
+            times: Optional[int] = None
             ) -> None:
         """
         Mock a response from the Mockserver
@@ -263,6 +285,9 @@ class Helper:
         :param request_method: The method to match
         :param response_body: The response body to return
         :param response_status: The response status code
+        :param request_body: The request body to match
+        :param times: The number of times to match the request.
+        None means infinite
         """
 
         url = f"{self.mockserver_url}/mockserver/expectation"
@@ -276,6 +301,19 @@ class Helper:
                 "statusCode": response_status,
             },
         }
+
+        if request_body:
+            mock["httpRequest"]["body"] = {
+                "type": "JSON",
+                "json": request_body,
+                "matchType": "ONLY_MATCHING_FIELDS"
+            }
+
+        if times:
+            mock["times"] = {
+                "remainingTimes": times,
+                "unlimited": False,
+            }
 
         # Send a PUT request to the MockServer to create the expectation
         requests.put(
