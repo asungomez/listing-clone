@@ -48,25 +48,6 @@ class TokenManager:
         :return: The email address from the token, the access token, and the
         refresh token
         """
-        # In testing environments we don't use real Okta, so the token is
-        # just a JSON string containing the claims
-        if settings.MOCK_AUTH:
-            decoded_token = json.loads(access_token)
-            is_invalid: bool = decoded_token.get("is_invalid", False)
-            if is_invalid:
-                raise SessionInvalidException(
-                    "The credentials are invalid"
-                )
-            is_expired: bool = decoded_token.get("is_expired", False)
-            if is_expired:
-                raise SessionExpiredException(
-                    "The credentials are expired"
-                )
-            mock_email: str = decoded_token.get('sub')
-            if not mock_email:
-                raise SessionInvalidException("Email not found in the token")
-            return mock_email, access_token
-
         url = f"{settings.OKTA['DOMAIN']}/userinfo"
         headers = {
             "Accept": "application/json",

@@ -105,7 +105,6 @@ def tests_helper(request: pytest.FixtureRequest) -> Helper:
             .with_env("DEBUG", "True")
             .with_env("DJANGO_SECRET_KEY", "test")
             .with_env("FRONT_END_URL", static.FRONT_END_URL)
-            .with_env("MOCK_AUTH", "True")
             .with_env("OKTA_CLIENT_ID", "client-id")
             .with_env("OKTA_CLIENT_SECRET", "client-secret")
             .with_env("OKTA_DOMAIN", f"{mockserver_url}/okta")

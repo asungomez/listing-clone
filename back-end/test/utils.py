@@ -1,4 +1,3 @@
-import json
 from typing import Any, Mapping, Optional, Sequence
 
 import psycopg2
@@ -107,10 +106,12 @@ class Helper:
             "Accept": "application/json",
         }
         if authenticated_as is not None:
-            access_token = json.dumps({
-                "sub": authenticated_as
-            })
-            headers["Authorization"] = f"Bearer {access_token}"
+            self.mock_okta_userinfo_response(
+                response_body={
+                    "email": authenticated_as
+                }
+            )
+            headers["Authorization"] = "Bearer fake-access-token"
         response = requests.get(url, allow_redirects=False, headers=headers)
         return response
 
@@ -167,6 +168,24 @@ class Helper:
         self.mock_response(
             request_path="/okta/oauth/token",
             request_method="POST",
+            response_body=response_body,
+            response_status=response_status,
+        )
+
+    def mock_okta_userinfo_response(
+            self,
+            response_body: Any,
+            response_status: int = 200
+            ) -> None:
+        """
+        Mock Okta's userinfo endpoint.
+
+        :param response_body: The response body to return
+        :param response_status: The response status code to return
+        """
+        self.mock_response(
+            request_path="/okta/userinfo",
+            request_method="GET",
             response_body=response_body,
             response_status=response_status,
         )

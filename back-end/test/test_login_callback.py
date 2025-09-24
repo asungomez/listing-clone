@@ -1,7 +1,6 @@
-from .utils import Helper
 from . import static
-import json
 from .factories.user import user_factory
+from .utils import Helper
 
 
 def test_missing_code(tests_helper: Helper) -> None:
@@ -40,14 +39,16 @@ def test_user_does_not_exist(tests_helper: Helper) -> None:
     """
     user_email = "not.existing.user@email.net"
     path = "/users/login-callback?code=123"
-    access_token = json.dumps({
-        "sub": user_email
-    })
     tests_helper.mock_okta_token_response(
         response_body={
-            "access_token": access_token,
+            "access_token": "fake-access-token",
         },
         response_status=200,
+    )
+    tests_helper.mock_okta_userinfo_response(
+        response_body={
+            "email": user_email,
+        }
     )
     response = tests_helper.get_request(path)
     assert response.status_code == 302
@@ -71,14 +72,16 @@ def test_user_exists(tests_helper: Helper) -> None:
     )
     tests_helper.insert_user(user)
     path = "/users/login-callback?code=123"
-    access_token = json.dumps({
-        "sub": user_email
-    })
     tests_helper.mock_okta_token_response(
         response_body={
-            "access_token": access_token,
+            "access_token": "fake-access-token",
         },
         response_status=200,
+    )
+    tests_helper.mock_okta_userinfo_response(
+        response_body={
+            "email": user_email,
+        }
     )
     response = tests_helper.get_request(path)
     assert response.status_code == 302
