@@ -215,7 +215,9 @@ class TokenManager:
             value=encrypted_credentials,
             domain=settings.AUTH_COOKIE_CONFIG["DOMAIN"],
             path=settings.AUTH_COOKIE_CONFIG["PATH"],
-            expires=settings.AUTH_COOKIE_CONFIG["LIFETIME"],
+            max_age=int(
+                settings.AUTH_COOKIE_CONFIG["LIFETIME"].total_seconds()
+            ),
             secure=settings.AUTH_COOKIE_CONFIG["SECURE"],
             httponly=settings.AUTH_COOKIE_CONFIG["HTTP_ONLY"],
             samesite=settings.AUTH_COOKIE_CONFIG["SAMESITE"],
@@ -305,10 +307,13 @@ class CustomAuthMiddleware(AuthenticationMiddleware):
         :return: The response object with the cookies set/removed
         """
         response_result = response
+        cookie_name = settings.AUTH_COOKIE_CONFIG["NAME"]
         if self.access_token and self.refresh_token:
             self.verifier.set_credentials_as_cookie(
                 response_result, self.access_token, self.refresh_token
             )
+        elif cookie_name in response_result.cookies:
+            return response_result
         else:
             self.verifier.remove_credentials_from_cookies(response_result)
         return response_result

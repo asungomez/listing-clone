@@ -1,8 +1,8 @@
 # Git
-.git 
+.git
 
 # Docker
-.docker 
+.docker
 
 # Python
 src/__pycache__
@@ -25,3 +25,6 @@ test/.pytest_cache
 
 # Local certificates
 .certs
+
+.mypy_cache
+.pytest_cache
