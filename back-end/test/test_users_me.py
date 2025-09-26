@@ -1,5 +1,5 @@
-from .utils import Helper
 from .factories.user import user_factory
+from .utils import Helper
 
 
 def test_without_auth_data(tests_helper: Helper) -> None:
@@ -9,7 +9,7 @@ def test_without_auth_data(tests_helper: Helper) -> None:
     """
     path = "/users/me"
     response = tests_helper.get_request(path)
-    assert response.status_code == 401
+    assert response.status_code == 403
 
 
 def test_authenticated_as_non_existent_user(tests_helper: Helper) -> None:

@@ -307,13 +307,10 @@ class CustomAuthMiddleware(AuthenticationMiddleware):
         :return: The response object with the cookies set/removed
         """
         response_result = response
-        cookie_name = settings.AUTH_COOKIE_CONFIG["NAME"]
         if self.access_token and self.refresh_token:
             self.verifier.set_credentials_as_cookie(
                 response_result, self.access_token, self.refresh_token
             )
-        elif cookie_name in response_result.cookies:
-            return response_result
         else:
             self.verifier.remove_credentials_from_cookies(response_result)
         return response_result

@@ -1,9 +1,10 @@
+from typing import cast
+
 from core.auth import TokenManager
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.http import HttpRequest, HttpResponse, JsonResponse
-from django.views import View
 from rest_framework import status
+from rest_framework.exceptions import NotAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -38,7 +39,7 @@ class LoginView(APIView):
             response = Response(
                 status=status.HTTP_302_FOUND,
                 headers={
-                    "Location": f"{settings.FRONT_END_URL}/profiles"
+                    "Location": f"{settings.FRONT_END_URL}/my-listings"
                 }
             )
             token_manager.set_credentials_as_cookie(response, at, rt)
@@ -53,16 +54,13 @@ class LoginView(APIView):
             )
 
 
-class CurrentUserView(View):
-    serializer = UserSerializer()
+class CurrentUserView(APIView):
 
-    def get(self, request: HttpRequest) -> HttpResponse:
+    def get(self, request: Request) -> Response:
         try:
             if not request.user.is_authenticated:
-                return JsonResponse({"error": "Not authenticated"}, status=401)
-            email = request.user.email
-            user = self.serializer.find_by_email(email)
-            return JsonResponse({"user": self.serializer(user).data})
+                raise NotAuthenticated()
+            user = cast(User, request.user)
+            return Response({"user": UserSerializer(user).data})
         except Exception as e:
-            json_error = {"error": str(e)}
-            return JsonResponse(json_error, status=401)
+            raise NotAuthenticated(str(e))
