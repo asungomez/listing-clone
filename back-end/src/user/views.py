@@ -1,6 +1,4 @@
-from typing import cast
-
-from core.auth import OktaAuthentication, TokenManager
+from core.auth import AuthenticatedAPIView, AuthenticatedRequest, TokenManager
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from rest_framework import status
@@ -53,10 +51,7 @@ class LoginView(APIView):
             )
 
 
-class CurrentUserView(APIView):
+class CurrentUserView(AuthenticatedAPIView):
 
-    authentication_classes = [OktaAuthentication]
-
-    def get(self, request: Request) -> Response:
-        user = cast(User, request.user)
-        return Response({"user": UserSerializer(user).data})
+    def get(self, request: AuthenticatedRequest) -> Response:
+        return Response({"user": UserSerializer(request.user).data})

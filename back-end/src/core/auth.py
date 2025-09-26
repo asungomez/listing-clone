@@ -3,15 +3,16 @@ from typing import Callable, Optional, Tuple
 
 import requests
 from core.crypto import Crypto
+from core.models import User
 from django.conf import settings
-from django.contrib.auth import get_user_model
 from django.http import HttpRequest
 from django.http.response import HttpResponseBase
 from rest_framework import authentication
 from rest_framework.exceptions import AuthenticationFailed
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.request import Request
+from rest_framework.views import APIView
 from user.serializers import UserSerializer
-
-User = get_user_model()
 
 
 class SessionExpiredException(Exception):
@@ -229,7 +230,9 @@ class OktaAuthentication(authentication.BaseAuthentication):
     Authentication class for Okta
     """
 
-    def authenticate(self, request: HttpRequest) -> Tuple[User, None]:
+    def authenticate(self, request: HttpRequest) -> Tuple[
+        Optional[User], None
+    ]:
         """
         Authenticate the user based on the token
         """
@@ -240,12 +243,7 @@ class OktaAuthentication(authentication.BaseAuthentication):
             at, rt = token_manager.get_tokens_from_request(base_request)
             original_access_token = at
             if at is None:
-                raise AuthenticationFailed(
-                    {
-                        "message": "There are not credentials in the request",
-                        "code": "missing_token"
-                    }
-                )
+                return None, None
             email, at = token_manager.authenticate(at, rt)
             user = UserSerializer().find_by_email(email)
             if not user.is_active:
@@ -333,3 +331,12 @@ class AuthenticationCookieMiddleware:
         elif to_delete:
             self.token_manager.remove_credentials_from_cookies(response)
         return response
+
+
+class AuthenticatedRequest(Request):
+    user: User
+
+
+class AuthenticatedAPIView(APIView):
+    authentication_classes = [OktaAuthentication]
+    permission_classes = [IsAuthenticated]
