@@ -3,15 +3,16 @@ from typing import Callable, Optional, Tuple
 
 import requests
 from core.crypto import Crypto
+from core.models import User
 from django.conf import settings
-from django.contrib.auth import get_user_model
-from django.contrib.auth.middleware import AuthenticationMiddleware
-from django.contrib.auth.models import AnonymousUser
-from django.http import HttpRequest, JsonResponse
+from django.http import HttpRequest
 from django.http.response import HttpResponseBase
+from rest_framework import authentication
+from rest_framework.exceptions import AuthenticationFailed
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.request import Request
+from rest_framework.views import APIView
 from user.serializers import UserSerializer
-
-User = get_user_model()
 
 
 class SessionExpiredException(Exception):
@@ -215,100 +216,127 @@ class TokenManager:
             value=encrypted_credentials,
             domain=settings.AUTH_COOKIE_CONFIG["DOMAIN"],
             path=settings.AUTH_COOKIE_CONFIG["PATH"],
-            expires=settings.AUTH_COOKIE_CONFIG["LIFETIME"],
+            max_age=int(
+                settings.AUTH_COOKIE_CONFIG["LIFETIME"].total_seconds()
+            ),
             secure=settings.AUTH_COOKIE_CONFIG["SECURE"],
             httponly=settings.AUTH_COOKIE_CONFIG["HTTP_ONLY"],
             samesite=settings.AUTH_COOKIE_CONFIG["SAMESITE"],
         )
 
 
-class CustomAuthMiddleware(AuthenticationMiddleware):
+class OktaAuthentication(authentication.BaseAuthentication):
     """
-    Custom authentication middleware to handle Okta authentication
+    Authentication class for Okta
     """
 
-    # Narrow get_response to a synchronous callable for type checking
-    get_response: Callable[[HttpRequest], HttpResponseBase]
-
-    verifier = TokenManager()
-    serializer = UserSerializer()
-    access_token: Optional[str] = None
-    refresh_token: Optional[str] = None
-
-    def __call__(self, request: HttpRequest) -> HttpResponseBase:
+    def authenticate(self, request: HttpRequest) -> Tuple[
+        Optional[User], None
+    ]:
         """
-        Call the middleware. This method is called by Django.
-
-        :param request: The request object
-        :return: The response from the view or an error response
+        Authenticate the user based on the token
         """
         try:
-            self.process_request(request)
+            token_manager = TokenManager()
+            # DRF passes a Request; get underlying HttpRequest for flags
+            base_request = getattr(request, "_request", request)
+            at, rt = token_manager.get_tokens_from_request(base_request)
+            original_access_token = at
+            if at is None:
+                return None, None
+            email, at = token_manager.authenticate(at, rt)
+            user = UserSerializer().find_by_email(email)
+            if not user.is_active:
+                raise InactiveUserException("User is inactive")
+            # If access token changed (refreshed), mark it for response cookies
+            if original_access_token != at and rt is not None:
+                setattr(base_request, "auth_tokens_to_set", (at, rt))
+            return user, None
         except SessionExpiredException as e:
-            return JsonResponse(
-                {"message": str(e), "code": "session_expired"},
-                status=401
+            base_req = getattr(request, "_request", request)
+            setattr(base_req, "delete_auth_cookie", True)
+            raise AuthenticationFailed(
+                {
+                    "message": str(e),
+                    "code": "session_expired"
+                }
             )
         except SessionInvalidException as e:
-            return JsonResponse(
-                {"message": str(e), "code": "session_invalid"},
-                status=401
+            base_req = getattr(request, "_request", request)
+            setattr(base_req, "delete_auth_cookie", True)
+            raise AuthenticationFailed(
+                {
+                    "message": str(e),
+                    "code": "session_invalid"
+                }
             )
         except InactiveUserException as e:
-            return JsonResponse(
-                {"message": str(e), "code": "inactive_user"},
-                status=403
+            base_req = getattr(request, "_request", request)
+            setattr(base_req, "delete_auth_cookie", True)
+            raise AuthenticationFailed(
+                {
+                    "message": str(e),
+                    "code": "inactive_user"
+                }
             )
         except User.DoesNotExist:
-            return JsonResponse(
-                {"message": "User not found", "code": "user_not_found"},
-                status=401
+            base_req = getattr(request, "_request", request)
+            setattr(base_req, "delete_auth_cookie", True)
+            raise AuthenticationFailed(
+                {
+                    "message": "User not found",
+                    "code": "user_not_found"
+                }
             )
         except ValueError as e:
-            return JsonResponse(
-                {"message": str(e), "code": "invalid_token"},
-                status=401
+            base_req = getattr(request, "_request", request)
+            setattr(base_req, "delete_auth_cookie", True)
+            raise AuthenticationFailed(
+                {
+                    "message": str(e),
+                    "code": "invalid_token"
+                }
             )
 
+
+class AuthenticationCookieMiddleware:
+    """
+    Middleware to synchronize authentication cookies based on flags set
+    during DRF authentication.
+    - If request.auth_tokens_to_set is present, set refreshed credentials.
+    - If request.delete_auth_cookie is True, delete credentials cookie.
+    """
+
+    def __init__(
+        self,
+        get_response: Callable[[HttpRequest], HttpResponseBase]
+    ) -> None:
+        self.get_response = get_response
+        self.token_manager = TokenManager()
+
+    def __call__(self, request: HttpRequest) -> HttpResponseBase:
         response = self.get_response(request)
         return self.process_response(request, response)
 
-    def process_request(self, request: HttpRequest) -> None:
-        """
-        Process the request to authenticate the user based on the token
-
-        :param request: The request object
-        """
-        at, rt = self.verifier.get_tokens_from_request(request)
-        if at is None:
-            request.user = AnonymousUser()
-            return
-        self.access_token = at
-        self.refresh_token = rt
-        email, at = self.verifier.authenticate(at, rt)
-        user = self.serializer.find_by_email(email)
-        if not user.is_active:
-            raise InactiveUserException("User is inactive")
-        request.user = user
-
     def process_response(
         self,
-        _: HttpRequest,
+        request: HttpRequest,
         response: HttpResponseBase
     ) -> HttpResponseBase:
-        """
-        Process the response to set the access and refresh tokens as cookies
-        or remove them from the cookies.
+        to_set = getattr(request, "auth_tokens_to_set", None)
+        to_delete = getattr(request, "delete_auth_cookie", False)
+        if to_set is not None:
+            at, rt = to_set
+            self.token_manager.set_credentials_as_cookie(response, at, rt)
+        elif to_delete:
+            self.token_manager.remove_credentials_from_cookies(response)
+        return response
 
-        :param _: The request object (not used)
-        :param response: The response object
-        :return: The response object with the cookies set/removed
-        """
-        response_result = response
-        if self.access_token and self.refresh_token:
-            self.verifier.set_credentials_as_cookie(
-                response_result, self.access_token, self.refresh_token
-            )
-        else:
-            self.verifier.remove_credentials_from_cookies(response_result)
-        return response_result
+
+class AuthenticatedRequest(Request):
+    user: User
+
+
+class AuthenticatedAPIView(APIView):
+    authentication_classes = [OktaAuthentication]
+    permission_classes = [IsAuthenticated]
