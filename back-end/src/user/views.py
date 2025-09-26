@@ -1,10 +1,9 @@
 from typing import cast
 
-from core.auth import TokenManager
+from core.auth import OktaAuthentication, TokenManager
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from rest_framework import status
-from rest_framework.exceptions import NotAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -56,11 +55,8 @@ class LoginView(APIView):
 
 class CurrentUserView(APIView):
 
+    authentication_classes = [OktaAuthentication]
+
     def get(self, request: Request) -> Response:
-        try:
-            if not request.user.is_authenticated:
-                raise NotAuthenticated()
-            user = cast(User, request.user)
-            return Response({"user": UserSerializer(user).data})
-        except Exception as e:
-            raise NotAuthenticated(str(e))
+        user = cast(User, request.user)
+        return Response({"user": UserSerializer(user).data})

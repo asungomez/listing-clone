@@ -102,7 +102,8 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    "core.auth.CustomAuthMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "core.auth.AuthenticationCookieMiddleware",
 ]
 
 ROOT_URLCONF = "app.urls"

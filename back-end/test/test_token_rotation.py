@@ -42,7 +42,7 @@ def test_access_token_valid_in_header(tests_helper: Helper) -> None:
 
 def test_access_token_invalid_in_cookie(tests_helper: Helper) -> None:
     """
-    Test that the response is 401 if the access token is invalid,
+    Test that the response is 403 if the access token is invalid,
     not expired and in the cookie.
     """
     path = "/users/me"
@@ -63,7 +63,7 @@ def test_access_token_invalid_in_cookie(tests_helper: Helper) -> None:
         authentication_method="cookie",
         omit_auth_mocking=True,
     )
-    assert response.status_code == 401
+    assert response.status_code == 403
     response_body = response.json()
     assert response_body["message"] == "The credentials are invalid"
     assert response_body["code"] == "session_invalid"
@@ -71,7 +71,7 @@ def test_access_token_invalid_in_cookie(tests_helper: Helper) -> None:
 
 def test_access_token_invalid_in_header(tests_helper: Helper) -> None:
     """
-    Test that the response is 401 if the access token is invalid,
+    Test that the response is 403 if the access token is invalid,
     not expired and in the header.
     """
     path = "/users/me"
@@ -92,7 +92,7 @@ def test_access_token_invalid_in_header(tests_helper: Helper) -> None:
         authentication_method="header",
         omit_auth_mocking=True,
     )
-    assert response.status_code == 401
+    assert response.status_code == 403
     response_body = response.json()
     assert response_body["message"] == "The credentials are invalid"
     assert response_body["code"] == "session_invalid"
@@ -102,7 +102,7 @@ def test_access_token_and_refresh_token_expired_in_cookie(
   tests_helper: Helper
   ) -> None:
     """
-    Test that the response is 401 if the cookie contains:
+    Test that the response is 403 if the cookie contains:
     - an access token that is valid but expired
     - a refresh token that is valid but expired
     """
@@ -131,7 +131,7 @@ def test_access_token_and_refresh_token_expired_in_cookie(
         authentication_method="cookie",
         omit_auth_mocking=True
     )
-    assert response.status_code == 401
+    assert response.status_code == 403
     response_body = response.json()
     assert response_body["message"] == "The credentials are expired"
     assert response_body["code"] == "session_expired"
@@ -184,7 +184,7 @@ def test_valid_refresh_token_in_cookie(tests_helper: Helper) -> None:
 
 def test_invalid_refresh_token_in_cookie(tests_helper: Helper) -> None:
     """
-    Test that the response is 401 if the cookie contains:
+    Test that the response is 403 if the cookie contains:
     - an access token that is valid but expired
     - a refresh token that is invalid
     """
@@ -213,7 +213,7 @@ def test_invalid_refresh_token_in_cookie(tests_helper: Helper) -> None:
         authentication_method="cookie",
         omit_auth_mocking=True,
     )
-    assert response.status_code == 401
+    assert response.status_code == 403
     response_body = response.json()
     assert response_body["message"] == "The credentials are invalid"
     assert response_body["code"] == "session_invalid"

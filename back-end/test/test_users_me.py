@@ -23,7 +23,7 @@ def test_authenticated_as_non_existent_user(tests_helper: Helper) -> None:
         path,
         authenticated_as=email,
     )
-    assert response.status_code == 401
+    assert response.status_code == 403
 
 
 def test_authenticated_as_existent_user(tests_helper: Helper) -> None:
