@@ -444,7 +444,7 @@ class Helper:
         document: dict[str, Any]
     ) -> dict[str, Any]:
         """
-        Transform a document to get it ready for SOLE.
+        Transform a document to get it ready for SOLR.
 
         :param document_type: The type of the document
         :param document: The document to transform
