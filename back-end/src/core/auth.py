@@ -294,7 +294,7 @@ class OktaAuthentication(authentication.BaseAuthentication):
             raise AuthenticationFailed(
                 {
                     "message": str(e),
-                    "code": "invalid_token"
+                    "code": "session_invalid"
                 }
             )
 

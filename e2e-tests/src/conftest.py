@@ -52,8 +52,10 @@ def tests_helper(request: pytest.FixtureRequest) -> Helper:
     mockserver_container: DockerContainer = None
     back_end_container: DockerContainer = None
     front_end_container: DockerContainer = None
+    solr_container: DockerContainer = None
     back_end_image = None
     front_end_image = None
+    solr_image = None
 
     def cleanup() -> None:
         try:
@@ -79,9 +81,16 @@ def tests_helper(request: pytest.FixtureRequest) -> Helper:
                 logger.info("Stopping front-end container")
                 front_end_container.stop()
                 front_end_container._container.remove(force=True)
+            if solr_container is not None:
+                logger.info("Stopping SOLR container")
+                solr_container.stop()
+                solr_container._container.remove(force=True)
             if front_end_image is not None:
                 logger.info("Removing front-end image")
                 docker_client.images.remove(front_end_image.id, force=True)
+            if solr_image is not None:
+                logger.info("Removing SOLR image")
+                docker_client.images.remove(solr_image.id, force=True)
         except Exception as e:
             logger.error("Error during cleanup: %s", str(e))
 
@@ -114,6 +123,22 @@ def tests_helper(request: pytest.FixtureRequest) -> Helper:
             .start()
         )
 
+        # Build the SOLR image
+        logger.info("Building SOLR image")
+        solr_image, _ = docker_client.images.build(
+            path="../back-end/solr",
+        )
+
+        # Spin up the SOLR container
+        logger.info("Starting SOLR container")
+        solr_container = (
+            DockerContainer(image=solr_image.id)
+            .with_exposed_ports(8983)
+            .with_network(network)
+            .with_network_aliases(("solr"))
+            .start()
+        )
+
         # Build the back-end image
         build_env = os.environ.get("BUILD_ENV", "development")
         logger.info("Building image")
@@ -126,6 +151,8 @@ def tests_helper(request: pytest.FixtureRequest) -> Helper:
         logger.info("Starting container")
         mockserver_url = "http://mockserver:1080"
         front_end_url = "http://front-end:5173"
+        solr_url = "http://solr:8983/solr"
+        solr_core = "mylistings"
         back_end_container = (
             DockerContainer(image=back_end_image.id)
             .with_exposed_ports(8000)
@@ -149,6 +176,8 @@ def tests_helper(request: pytest.FixtureRequest) -> Helper:
                 "ENCRYPTION_KEY",
                 "HqvJK8Ur9q_ZFZlnM-1TOKu7sK4HidccP6NnmMdCEVo="
                 )
+            .with_env("SOLR_URL", solr_url)
+            .with_env("SOLR_CORE", solr_core)
             .with_network(network)
             .with_network_aliases(("back-end"))
             .start()
@@ -221,11 +250,17 @@ def tests_helper(request: pytest.FixtureRequest) -> Helper:
 
         set_base_url(front_end_url)
 
+        # Get the external SOLR URL
+        solr_host = solr_container.get_container_host_ip()
+        solr_port = solr_container.get_exposed_port(8983)
+        solr_external_url = f"http://{solr_host}:{solr_port}/solr/{solr_core}"
+
         helper = Helper(
             db_port=db_port,
             mockserver_url=mockserver_external_url,
             back_end_url=back_end_url,
-            front_end_url=front_end_url
+            front_end_url=front_end_url,
+            solr_url=solr_external_url
           )
         return helper
     except Exception as e:
@@ -244,6 +279,7 @@ def tear_down(request: pytest.FixtureRequest, tests_helper: Helper) -> None:
     def cleanup() -> None:
         tests_helper.clean_up_db()
         tests_helper.clean_up_mocks()
+        tests_helper.clean_up_solr()
 
     request.addfinalizer(cleanup)
 

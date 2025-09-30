@@ -26,3 +26,8 @@ services:
       - POSTGRES_DB=django_course
       - POSTGRES_USER=django_course
       - POSTGRES_PASSWORD=django_course
+  solr:
+    build:
+      context: ./solr
+    ports:
+      - "8989:8983"

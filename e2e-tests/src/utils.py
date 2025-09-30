@@ -1,7 +1,7 @@
 import datetime
 import logging
 from contextlib import contextmanager
-from typing import Any, Generator
+from typing import Any, Dict, Generator
 
 import requests
 from playwright.sync_api import Page
@@ -20,6 +20,7 @@ class Helper:
     mockserver_url: str
     back_end_url: str
     front_end_url: str
+    solr_url: str
     db_engine: Engine
     db_metadata: MetaData
 
@@ -28,7 +29,8 @@ class Helper:
             db_port: int,
             mockserver_url: str,
             back_end_url: str,
-            front_end_url: str
+            front_end_url: str,
+            solr_url: str
             ):
         """
         Initialize the Helper class.
@@ -46,6 +48,7 @@ class Helper:
         self.mockserver_url = mockserver_url
         self.back_end_url = back_end_url
         self.front_end_url = front_end_url
+        self.solr_url = solr_url
 
     def __del__(self) -> None:
         """Close the database connection when the object is destroyed."""
@@ -139,6 +142,18 @@ class Helper:
         url = f"{self.mockserver_url}/mockserver/reset"
         requests.put(url)
 
+    def clean_up_solr(self) -> None:
+        """
+        Clean up the SOLR index.
+        """
+        response = requests.post(
+            f"{self.solr_url}/update",
+            params={"commit": "true"},
+            json={"delete": {"query": "*:*"}},
+            headers={"Content-Type": "application/json"},
+        )
+        response.raise_for_status()
+
     def db_table(self, table_name: str) -> Table:
         """
         Get a SQLAlchemy Table object for the specified table name.
@@ -151,6 +166,28 @@ class Helper:
             self.db_metadata,
             autoload_with=self.db_engine
         )
+
+    def index_solr_document(
+        self,
+        document_type: str,
+        document: dict[str, Any]
+    ) -> None:
+        """
+        Index a document into the SOLR.
+
+        :param document_type: The type of the document
+        :param document: The document to index
+        """
+        transformed_document = self.transform_solr_document(
+            document_type,
+            document
+            )
+        response = requests.post(
+            f"{self.solr_url}/update?commit=true",
+            json=[transformed_document],
+            headers={"Content-Type": "application/json"}
+            )
+        response.raise_for_status()
 
     def insert_user(self, user: User) -> None:
         """
@@ -174,6 +211,11 @@ class Helper:
             result = connection.execute(insert_stmt)
             id = result.inserted_primary_key[0]
             user.id = id
+
+            self.index_solr_document(
+                document_type="user",
+                document=user.to_dict()
+            )
 
     def mock_okta_userinfo_response(
             self,
@@ -227,3 +269,30 @@ class Helper:
             json=mock,
             headers={"Content-Type": "application/json"},
         )
+
+    def transform_solr_document(
+        self,
+        document_type: str,
+        document: dict[str, Any]
+    ) -> dict[str, Any]:
+        """
+        Transform a document to get it ready for SOLR.
+
+        :param document_type: The type of the document
+        :param document: The document to transform
+        :return: The transformed document
+        """
+        transformed_document: Dict[str, Any] = {}
+        for key, value in document.items():
+            if key == "id":
+                transformed_document[key] = f"{document_type}:{value}"
+            elif isinstance(value, str):
+                transformed_document[f"{key}_s"] = value
+            elif isinstance(value, bool):
+                transformed_document[f"{key}_b"] = value
+            elif isinstance(value, int):
+                transformed_document[f"{key}_i"] = value
+            elif isinstance(value, float):
+                transformed_document[f"{key}_f"] = value
+
+        return transformed_document

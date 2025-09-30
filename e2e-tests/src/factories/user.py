@@ -16,6 +16,21 @@ class User:
     date_joined: str
     is_active: bool
 
+    def to_dict(self) -> dict[str, Any]:
+        """
+        Convert the User instance to a dictionary.
+        """
+        return {
+            'id': self.id,
+            'is_superuser': self.is_superuser,
+            'email': self.email,
+            'username': self.username,
+            'first_name': self.first_name,
+            'last_name': self.last_name,
+            'date_joined': self.date_joined,
+            'is_active': self.is_active,
+        }
+
 
 class UserFactory:
     """Factory for creating User instances for testing."""

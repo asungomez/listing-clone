@@ -1,9 +1,13 @@
 import json
+import logging
 from typing import Any, Dict, Literal, Mapping, Optional, Sequence, Tuple
 
 import psycopg2
 import requests
 from cryptography.fernet import Fernet
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 class Helper:
@@ -16,6 +20,7 @@ class Helper:
     mockserver_url: str
     db_connection: psycopg2.extensions.connection
     encryption_key: str
+    solr_url: str
 
     def __init__(
             self,
@@ -23,6 +28,7 @@ class Helper:
             mockserver_url: str,
             db_port: int,
             encryption_key: str,
+            solr_url: str,
             ):
         """
         Initialize the Helper class.
@@ -31,6 +37,8 @@ class Helper:
         :param mockserver_url: The URL of the MockServer
         :param db_port: The port of the database
         :param encryption_key: The encryption key to use for the crypto
+        :param solr_url: The URL of the SOLR
+        :param solr_core: The core of the SOLR
         """
         self.api_url = api_url
         self.mockserver_url = mockserver_url
@@ -42,6 +50,7 @@ class Helper:
             port=db_port
         )
         self.encryption_key = encryption_key
+        self.solr_url = solr_url
 
     def authenticate(
         self,
@@ -100,6 +109,18 @@ class Helper:
         url = f"{self.mockserver_url}/mockserver/reset"
         requests.put(url)
 
+    def clean_up_solr(self) -> None:
+        """
+        Clean up the SOLR index.
+        """
+        response = requests.post(
+            f"{self.solr_url}/update",
+            params={"commit": "true"},
+            json={"delete": {"query": "*:*"}},
+            headers={"Content-Type": "application/json"},
+        )
+        response.raise_for_status()
+
     def encrypt(self, value: str) -> str:
         """
         Encrypt a value using the same encryption key as the one used
@@ -117,29 +138,14 @@ class Helper:
         :return: The user object
         """
         lower_email = email.lower()
-        query = """
-        SELECT
-            id, email, username, first_name, last_name
-        FROM core_user
-        WHERE email = %s
-        """
-        params = (lower_email,)
-        result = self.query_db(query, params)
+        result = self.search_solr(
+            document_type="user",
+            query={"email": lower_email},
+        )
         if result is None or len(result) == 0:
             return None
         first_result = result[0]
-        if len(first_result) < 5:
-            raise ValueError(
-                "The result of the user query does not contain all the fields"
-            )
-        user_dict = {
-            "id": first_result[0],
-            "email": first_result[1],
-            "username": first_result[2],
-            "first_name": first_result[3],
-            "last_name": first_result[4],
-        }
-        return user_dict
+        return first_result
 
     def get_request(
             self,
@@ -182,6 +188,28 @@ class Helper:
             )
         return response
 
+    def index_solr_document(
+        self,
+        document_type: str,
+        document: dict[str, Any]
+    ) -> None:
+        """
+        Index a document into the SOLR.
+
+        :param document_type: The type of the document
+        :param document: The document to index
+        """
+        transformed_document = self.transform_solr_document(
+            document_type,
+            document
+            )
+        response = requests.post(
+            f"{self.solr_url}/update?commit=true",
+            json=[transformed_document],
+            headers={"Content-Type": "application/json"}
+            )
+        response.raise_for_status()
+
     def insert_user(self, user: dict[str, Any]) -> None:
         """
         Insert a user into the database.
@@ -189,7 +217,7 @@ class Helper:
         :param user: The user object to insert
         """
         if self.db_connection is None:
-            return None
+            raise Exception("Database connection is not established")
 
         cursor = self.db_connection.cursor()
         query = """
@@ -215,10 +243,19 @@ class Helper:
                 NOW(),
                 NOW()
             )
+            RETURNING id
         """
         cursor.execute(query, user)
+        returned_element = cursor.fetchone()
+        if returned_element is None:
+            raise Exception("Error inserting user into the database")
+        user["id"] = returned_element[0]
         self.db_connection.commit()
         cursor.close()
+        self.index_solr_document(
+            document_type="user",
+            document=user
+        )
 
     def mock_okta_token_response(
             self,
@@ -346,3 +383,87 @@ class Helper:
             pass
         cursor.close()
         return result
+
+    def reverse_transform_solr_document(
+        self,
+        document: dict[str, Any]
+    ) -> dict[str, Any]:
+        """
+        Reverse transform a document to get it ready for the database.
+
+        :param document_type: The type of the document
+        :param document: The document to reverse transform
+        :return: The reverse transformed document
+        """
+        transformed_document: Dict[str, Any] = {}
+        for key, value in document.items():
+            if key == "id":
+                try:
+                    id_value = value.split(":")[1]
+                    numeric_value = int(id_value)
+                    transformed_document[key] = numeric_value
+                except Exception as e:
+                    raise e
+            elif key.endswith("_s"):
+                transformed_document[key[:-2]] = value
+            elif key.endswith("_i"):
+                transformed_document[key[:-2]] = int(value)
+            elif key.endswith("_f"):
+                transformed_document[key[:-2]] = float(value)
+            elif key.endswith("_b"):
+                transformed_document[key[:-2]] = bool(value)
+        return transformed_document
+
+    def search_solr(
+        self,
+        document_type: str,
+        query: dict[str, Any]
+    ) -> list[dict[str, Any]]:
+        """
+        Search the SOLR index.
+
+        :param document_type: The type of the document
+        :param query: The query to search for
+        :return: The result of the search
+        """
+        transformed_query = self.transform_solr_document(document_type, query)
+        query_string = "&".join([
+            f"{key}:{value}" for key, value in transformed_query.items()
+            ])
+        response = requests.get(
+            f"{self.solr_url}/select?q={query_string}&wt=json"
+            )
+        response.raise_for_status()
+        response_body = response.json()
+        docs = response_body.get("response", {}).get("docs", [])
+        return [
+            self.reverse_transform_solr_document(doc)
+            for doc in docs
+        ]
+
+    def transform_solr_document(
+        self,
+        document_type: str,
+        document: dict[str, Any]
+    ) -> dict[str, Any]:
+        """
+        Transform a document to get it ready for SOLR.
+
+        :param document_type: The type of the document
+        :param document: The document to transform
+        :return: The transformed document
+        """
+        transformed_document: Dict[str, Any] = {}
+        for key, value in document.items():
+            if key == "id":
+                transformed_document[key] = f"{document_type}:{value}"
+            elif isinstance(value, str):
+                transformed_document[f"{key}_s"] = value
+            elif isinstance(value, bool):
+                transformed_document[f"{key}_b"] = value
+            elif isinstance(value, int):
+                transformed_document[f"{key}_i"] = value
+            elif isinstance(value, float):
+                transformed_document[f"{key}_f"] = value
+
+        return transformed_document

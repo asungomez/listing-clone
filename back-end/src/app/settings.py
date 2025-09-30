@@ -45,6 +45,10 @@ env = environ.Env(
     ENCRYPTION_KEY=(str, None),
     # Frontend URL for the application
     FRONT_END_URL=(str, None),
+    # Solr core name
+    SOLR_CORE=(str, None),
+    # Solr URL
+    SOLR_URL=(str, None),
     # Okta client ID
     OKTA_CLIENT_ID=(str, None),
     # Okta client secret
@@ -203,3 +207,7 @@ LOGGING = {
         'level': 'DEBUG',
     },
 }
+
+# Solr config
+SOLR_URL = env.str("SOLR_URL")
+SOLR_CORE = env.str("SOLR_CORE")

@@ -24,10 +24,12 @@ def tests_helper(request: pytest.FixtureRequest) -> Helper:
     url = None
     api_container: DockerContainer = None
     client = docker.from_env()
-    image = None
+    api_image = None
+    solr_image = None
     network: Network = None
     db_container: DockerContainer = None
     mockserver_container: DockerContainer = None
+    solr_container: DockerContainer = None
 
     def cleanup() -> None:
         try:
@@ -45,12 +47,19 @@ def tests_helper(request: pytest.FixtureRequest) -> Helper:
                 logger.info("Stopping mockserver container")
                 mockserver_container.stop()
                 mockserver_container._container.remove(force=True)
+            if solr_container is not None:
+                logger.info("Stopping SOLR container")
+                solr_container.stop()
+                solr_container._container.remove(force=True)
             if network is not None:
                 logger.info("Removing network")
                 network.remove()
-            if image is not None:
-                logger.info("Removing image")
-                client.images.remove(image.id, force=True)
+            if api_image is not None:
+                logger.info("Removing API image")
+                client.images.remove(api_image.id, force=True)
+            if solr_image is not None:
+                logger.info("Removing SOLR image")
+                client.images.remove(solr_image.id, force=True)
         except Exception as e:
             logger.error("Error during cleanup: %s", str(e))
 
@@ -83,10 +92,26 @@ def tests_helper(request: pytest.FixtureRequest) -> Helper:
             .start()
         )
 
+        # Build the SOLR image
+        logger.info("Building SOLR image")
+        solr_image, _ = client.images.build(
+            path="solr",
+            )
+
+        # Spin up the SOLR container
+        logger.info("Starting SOLR container")
+        solr_container = (
+            DockerContainer(image=solr_image.id)
+            .with_exposed_ports(8983)
+            .with_network(network)
+            .with_network_aliases(("solr"))
+            .start()
+        )
+
         # Build the API image
         build_env = os.environ.get("BUILD_ENV", "development")
-        logger.info("Building image")
-        image, _ = client.images.build(
+        logger.info("Building API image")
+        api_image, _ = client.images.build(
             path=".",
             buildargs={"BUILD_ENV": build_env}
             )
@@ -95,8 +120,10 @@ def tests_helper(request: pytest.FixtureRequest) -> Helper:
         logger.info("Starting container")
         mockserver_url = "http://mockserver:1080"
         encryption_key = "HqvJK8Ur9q_ZFZlnM-1TOKu7sK4HidccP6NnmMdCEVo="
+        solr_url = "http://solr:8983/solr"
+        solr_core = "mylistings"
         api_container = (
-            DockerContainer(image=image.id)
+            DockerContainer(image=api_image.id)
             .with_exposed_ports(8000)
             .with_env("DB_HOST", "db")
             .with_env("DB_NAME", "test")
@@ -115,6 +142,8 @@ def tests_helper(request: pytest.FixtureRequest) -> Helper:
                 "ENCRYPTION_KEY",
                 encryption_key
                 )
+            .with_env("SOLR_URL", solr_url)
+            .with_env("SOLR_CORE", solr_core)
             .with_network(network)
             .start()
         )
@@ -152,21 +181,30 @@ def tests_helper(request: pytest.FixtureRequest) -> Helper:
         # Get the DB port
         db_port = db_container.get_exposed_port(5432)
 
+        # Get the external SOLR URL
+        solr_host = solr_container.get_container_host_ip()
+        solr_port = solr_container.get_exposed_port(8983)
+        solr_external_url = f"http://{solr_host}:{solr_port}/solr/{solr_core}"
+
         helper = Helper(
             api_url=api_url,
             mockserver_url=mockserver_external_url,
             db_port=db_port,
             encryption_key=encryption_key,
+            solr_url=solr_external_url,
         )
         return helper
     except Exception as e:
         logger.error("Error starting containerized system: %s", str(e))
-        if db_container is not None:
-            logs = db_container.get_logs()[0].decode("utf-8")
-            logger.error("DB Container logs:\n%s", logs)
         if mockserver_container is not None:
             logs = mockserver_container.get_logs()[0].decode("utf-8")
             logger.error("Mockserver Container logs:\n%s", logs)
+        if solr_container is not None:
+            logs = solr_container.get_logs()[0].decode("utf-8")
+            logger.error("SOLR Container logs:\n%s", logs)
+        if db_container is not None:
+            logs = db_container.get_logs()[0].decode("utf-8")
+            logger.error("DB Container logs:\n%s", logs)
         if api_container is not None:
             logs = api_container.get_logs()[0].decode("utf-8")
             logger.error("API Container logs:\n%s", logs)
@@ -184,6 +222,7 @@ def tear_down(request: pytest.FixtureRequest, tests_helper: Helper) -> None:
     def cleanup() -> None:
         tests_helper.clean_up_mocks()
         tests_helper.clean_up_db()
+        tests_helper.clean_up_solr()
         pass
 
     request.addfinalizer(cleanup)
