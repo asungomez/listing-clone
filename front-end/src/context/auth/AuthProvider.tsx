@@ -40,6 +40,10 @@ export const AuthProvider: FC<AuthProviderProps> = ({ children }) => {
                 errorMessage =
                   "Your account is inactive. Please contact support.";
                 break;
+              case "user_not_found":
+                errorMessage =
+                  "Your account does not exist. Please contact support.";
+                break;
             }
           }
           if (errorMessage) {

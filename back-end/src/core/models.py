@@ -3,13 +3,13 @@ This file contains the database models for the core app.
 """
 
 from __future__ import annotations
-from django.db import models
-from django.contrib.auth.models import (
-    AbstractBaseUser,
-    BaseUserManager,
-    PermissionsMixin,
-)
+
 from typing import Any
+
+from django.contrib.auth.models import (
+    AbstractBaseUser, BaseUserManager, PermissionsMixin,
+)
+from django.db import models
 
 
 class UserManager(BaseUserManager['User']):
@@ -47,10 +47,10 @@ class User(AbstractBaseUser, PermissionsMixin):
         )
 
     """The first name of the user"""
-    first_name = models.CharField(max_length=255)
+    first_name = models.CharField(max_length=255, null=True)
 
     """The last name of the user"""
-    last_name = models.CharField(max_length=255)
+    last_name = models.CharField(max_length=255, null=True)
 
     """When the user last logged in"""
     last_login = models.DateTimeField(

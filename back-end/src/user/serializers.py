@@ -6,10 +6,17 @@ from typing import Any
 from core.models import User
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
+from user.indexer import UserIndexer
 
 
 class UserSerializer(serializers.ModelSerializer[User]):
     """Serializer for the user object"""
+
+    indexer: UserIndexer
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.indexer = UserIndexer()
 
     class Meta:
         model = get_user_model()
@@ -24,12 +31,17 @@ class UserSerializer(serializers.ModelSerializer[User]):
 
     def create(self, validated_data: dict[str, Any]) -> User:
         """Create and return a new user"""
-        return get_user_model().objects.create_user(**validated_data)
+        try:
+            user = get_user_model().objects.create_user(**validated_data)
+            self.indexer.add(user)
+            return user
+        except Exception as e:
+            raise e
 
     def find_by_email(self, email: str) -> User:
         """Find a user by email"""
-        email_parts = email.lower().split("@")
-        if len(email_parts) != 2:
-            raise ValueError("Invalid email")
-        username = email_parts[0]
-        return get_user_model().objects.get(username=username)
+        lower_email = email.lower()
+        user = self.indexer.search_by_email(lower_email)
+        if not user:
+            raise User.DoesNotExist("User not found")
+        return user
