@@ -16,19 +16,22 @@ class Indexer:
 
     url: str
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.url = f"{settings.SOLR_URL}/{settings.SOLR_CORE}"
 
-    def build_query(self, query: Dict[str, Any]):
+    def build_query(self, query: Dict[str, Any]) -> str:
         """
         Build a query string from a dictionary of parameters.
+
+        :param query: The query to build.
+        :return: The built query.
         """
         transformed_query = self.transform_data(query)
         return "&".join([
             f"{key}:{value}" for key, value in transformed_query.items()
             ])
 
-    def update(self, data: Dict[str, Any]):
+    def update(self, data: Dict[str, Any]) -> None:
         """
         Index a new document into the Solr index.
 
@@ -42,16 +45,18 @@ class Indexer:
             )
         response.raise_for_status()
 
-    def select(self, query: str):
+    def select(self, query: str) -> Dict[str, Any]:
         """
         Search the Solr index for a given query.
 
         :param query: The query to search for.
+        :return: The response from the Solr index.
         """
         try:
             response = requests.get(f"{self.url}/select?q={query}&wt=json")
             response.raise_for_status()
-            return response.json()
+            response_body: Dict[str, Any] = response.json()
+            return response_body
         except Exception as e:
             raise e
 
@@ -114,9 +119,11 @@ class ModelIndexer(Indexer, ABC, Generic[GenericModel]):
         self.serializer_class = serializer_class
         super().__init__()
 
-    def add(self, instance: GenericModel):
+    def add(self, instance: GenericModel) -> None:
         """
         Index a new document into the Solr index.
+
+        :param instance: The instance to index.
         """
         serializer = self.serializer_class(instance)
         data = serializer.data
@@ -126,8 +133,8 @@ class ModelIndexer(Indexer, ABC, Generic[GenericModel]):
         """
         Search the Solr index for a given query.
         """
-        query = self.build_query(query)
-        response = self.select(query)
+        query_str = self.build_query(query)
+        response = self.select(query_str)
         docs = response.get("response", {}).get("docs", [])
         model_cls: Type[GenericModel] = self.serializer_class.Meta.model
         results: List[GenericModel] = []

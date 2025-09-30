@@ -14,7 +14,13 @@ class UserSerializer(serializers.ModelSerializer[User]):
 
     indexer: UserIndexer
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        """
+        Initialize the serializer
+
+        :param args: The arguments to initialize the serializer.
+        :param kwargs: The keyword arguments to initialize the serializer.
+        """
         super().__init__(*args, **kwargs)
         self.indexer = UserIndexer()
 
