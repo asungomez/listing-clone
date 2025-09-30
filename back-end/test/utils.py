@@ -246,7 +246,10 @@ class Helper:
             RETURNING id
         """
         cursor.execute(query, user)
-        user["id"] = cursor.fetchone()[0]
+        returned_element = cursor.fetchone()
+        if returned_element is None:
+            raise Exception("Error inserting user into the database")
+        user["id"] = returned_element[0]
         self.db_connection.commit()
         cursor.close()
         self.index_solr_document(
@@ -414,7 +417,7 @@ class Helper:
     def search_solr(
         self,
         document_type: str,
-        query: str
+        query: dict[str, Any]
     ) -> list[dict[str, Any]]:
         """
         Search the SOLR index.
