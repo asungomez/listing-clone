@@ -65,7 +65,9 @@ class Indexer:
         """
         reverse_transformed_data: Dict[str, Any] = {}
         for key, value in data.items():
-            if key.endswith("_s"):
+            if key == "id":
+                reverse_transformed_data[key] = value
+            elif key.endswith("_s"):
                 reverse_transformed_data[key[:-2]] = value
             elif key.endswith("_i"):
                 reverse_transformed_data[key[:-2]] = int(value)
@@ -84,7 +86,11 @@ class Indexer:
         """
         transformed_data: Dict[str, Any] = {}
         for key, value in data.items():
-            if isinstance(value, str):
+            if not value:
+                continue
+            if key == "id":
+                transformed_data[key] = value
+            elif isinstance(value, str):
                 transformed_data[f"{key}_s"] = value
             elif isinstance(value, int):
                 transformed_data[f"{key}_i"] = value
@@ -132,3 +138,18 @@ class ModelIndexer(Indexer, ABC, Generic[GenericModel]):
                 instance = model_cls(**transformed_doc)
                 results.append(instance)
         return results
+
+    def transform_data(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        transformed_data = super().transform_data(data)
+        if "id" in transformed_data:
+            id_value = transformed_data["id"]
+            class_name = self.serializer_class.Meta.model.__name__.lower()
+            transformed_data["id"] = f"{class_name}:{id_value}"
+        return transformed_data
+
+    def reverse_transform_data(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        reverse_transformed_data = super().reverse_transform_data(data)
+        if "id" in reverse_transformed_data:
+            id_value = reverse_transformed_data["id"]
+            reverse_transformed_data["id"] = int(id_value.split(":")[1])
+        return reverse_transformed_data
