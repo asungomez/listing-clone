@@ -70,3 +70,26 @@ def test_logout_valid_token(tests_helper: Helper) -> None:
       authenticated_as=email,
     )
     assert response.status_code == 200
+
+
+def test_logout_failing_okta_revoke(tests_helper: Helper) -> None:
+    """
+    Test that the logout endpoint returns 500 if the Okta revoke endpoint
+    fails.
+    """
+    tests_helper.mock_okta_revoke_response(
+        response_body={
+            "message": "Token revoked"
+        },
+        response_status=500,
+    )
+    email = "existing.email@email.net"
+    user = user_factory({
+        "email": email,
+    })
+    tests_helper.insert_user(user)
+    response = tests_helper.post_request(
+      path="/users/logout",
+      authenticated_as=email,
+    )
+    assert response.status_code == 500
