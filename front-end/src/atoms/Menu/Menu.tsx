@@ -10,22 +10,33 @@ type MenuProps = React.DetailedHTMLProps<
     label: string;
     href: string;
   }[];
+  orientation?: "vertical" | "horizontal";
 };
 
-export const Menu: FC<MenuProps> = ({ items }) => {
+export const Menu: FC<MenuProps> = ({
+  items,
+  className,
+  orientation = "horizontal",
+  ...rest
+}) => {
   return (
-    <div className="hidden md:block">
-      <ul className="font-medium flex items-center gap-6">
+    <div className={clsx(className)} {...rest}>
+      <ul
+        className={clsx("font-medium flex gap-6", {
+          "flex-col items-start": orientation === "vertical",
+          "flex-row items-center": orientation === "horizontal",
+        })}
+      >
         {items.map((item) => (
           <li key={item.href}>
             <NavLink
               to={item.href}
               className={({ isActive }) =>
                 clsx(
-                  "block py-2 px-3 rounded-sm md:p-0",
+                  "block py-2 px-3 rounded-sm",
                   isActive
-                    ? "text-white md:text-blue-500"
-                    : "text-white hover:bg-gray-700 hover:text-white md:border-0 md:hover:bg-transparent md:hover:text-blue-500"
+                    ? "text-blue-500"
+                    : "text-white border-0 hover:text-blue-500"
                 )
               }
               aria-current="page"
