@@ -257,6 +257,24 @@ class Helper:
             document=user
         )
 
+    def mock_okta_revoke_response(
+            self,
+            response_body: Any,
+            response_status: int = 200,
+            ) -> None:
+        """
+        Mock Okta's revoke endpoint.
+
+        :param response_body: The response body to return
+        :param response_status: The response status code to return
+        """
+        self.mock_response(
+            request_path="/okta/oauth/revoke",
+            request_method="POST",
+            response_body=response_body,
+            response_status=response_status,
+        )
+
     def mock_okta_token_response(
             self,
             response_body: Any,
@@ -358,6 +376,38 @@ class Helper:
             json=mock,
             headers={"Content-Type": "application/json"},
         )
+
+    def post_request(
+            self,
+            path: str,
+            body: Any = None,
+            authenticated_as: Optional[str] = None,
+            authentication_method: Literal["header", "cookie"] = "cookie",
+            omit_auth_mocking: bool = False,
+            ) -> requests.Response:
+        """
+        Make a POST request to the API.
+        """
+        url = f"{self.api_url}{path}"
+        headers = {
+            "Accept": "application/json",
+        }
+        cookies: Dict[str, Any] = {}
+        if authenticated_as is not None:
+            headers, cookies = self.authenticate(
+                authenticated_as,
+                authentication_method,
+                omit_auth_mocking
+            )
+            headers.update(headers)
+            cookies.update(cookies)
+        response = requests.post(
+            url,
+            json=body,
+            headers=headers,
+            cookies=cookies
+        )
+        return response
 
     def query_db(
             self,
