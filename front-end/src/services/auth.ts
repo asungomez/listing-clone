@@ -8,3 +8,7 @@ export const getAuthenticatedUser = async (): Promise<User> => {
   }
   return data.user;
 };
+
+export const logOut = async (): Promise<void> => {
+  await fetcher.post("/auth/logout");
+};

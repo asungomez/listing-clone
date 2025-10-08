@@ -1,11 +1,15 @@
-import { FC, useState } from "react";
+import { FC, useRef, useState } from "react";
 import { Link } from "react-router";
 import { TopBar } from "../../atoms/TopBar/TopBar";
 import logo from "../../assets/logo.svg";
-import { Menu } from "../../atoms/Menu/Menu";
+import { Menu, MenuItem } from "../../atoms/Menu/Menu";
 import { Drawer } from "../../atoms/Drawer/Drawer";
+import { Popover } from "../../atoms/Popover/Popover";
+import { useAuth } from "../../context/auth/AuthContext";
+import { UserMenu } from "../UserMenu/UserMenu";
+import { FiMenu, FiUser } from "react-icons/fi";
 
-const MENU_ITEMS = [
+const MENU_ITEMS: MenuItem[] = [
   { label: "My Listings", href: "/my-listings" },
   { label: "All JLL Properties", href: "/properties" },
   { label: "Team Listings", href: "/team-listings" },
@@ -14,6 +18,9 @@ const MENU_ITEMS = [
 
 export const NavBar: FC = () => {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const userButtonRef = useRef<HTMLButtonElement | null>(null);
+  const { user } = useAuth();
   return (
     <TopBar>
       <div className="flex w-full items-center justify-between">
@@ -24,18 +31,7 @@ export const NavBar: FC = () => {
             aria-label="Toggle menu"
             onClick={() => setIsDrawerOpen(true)}
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="currentColor"
-              className="size-6"
-            >
-              <path
-                fillRule="evenodd"
-                d="M3.75 6.75A.75.75 0 0 1 4.5 6h15a.75.75 0 0 1 0 1.5h-15a.75.75 0 0 1-.75-.75Zm0 5.25a.75.75 0 0 1 .75-.75h15a.75.75 0 0 1 0 1.5h-15a.75.75 0 0 1-.75-.75Zm.75 4.5a.75.75 0 0 0 0 1.5h15a.75.75 0 0 0 0-1.5h-15Z"
-                clipRule="evenodd"
-              />
-            </svg>
+            <FiMenu size={24} />
           </button>
           <Link
             to="/"
@@ -48,7 +44,34 @@ export const NavBar: FC = () => {
           </Link>
           <Menu className="hidden md:block" items={MENU_ITEMS} />
         </div>
-        <div>{/* user menu goes here */}</div>
+        <div className="flex items-center">
+          {user && (
+            <>
+              <button
+                ref={userButtonRef}
+                type="button"
+                className="inline-flex items-center justify-center p-2 text-white hover:bg-gray-800 rounded-full"
+                aria-label="User menu"
+                aria-haspopup="dialog"
+                aria-expanded={isUserMenuOpen}
+                onClick={() => setIsUserMenuOpen((v) => !v)}
+              >
+                <FiUser size={24} />
+              </button>
+
+              <Popover
+                anchor={userButtonRef}
+                open={isUserMenuOpen}
+                position="bottom"
+              >
+                <Popover.Title>{user.email}</Popover.Title>
+                <div className="px-3 py-2">
+                  <UserMenu />
+                </div>
+              </Popover>
+            </>
+          )}
+        </div>
       </div>
       <Drawer open={isDrawerOpen} onClose={() => setIsDrawerOpen(false)}>
         <div className="p-4">

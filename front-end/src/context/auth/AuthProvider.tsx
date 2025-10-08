@@ -1,5 +1,8 @@
 import { FC, ReactNode, useCallback, useEffect, useState } from "react";
-import { getAuthenticatedUser } from "../../services/auth";
+import {
+  getAuthenticatedUser,
+  logOut as logOutService,
+} from "../../services/auth";
 import { AuthContext, AuthStatus } from "./AuthContext";
 import { Spinner } from "../../atoms/Spinner/Spinner";
 import { MessagePage } from "../../features/MessagePage/MessagePage";
@@ -65,6 +68,16 @@ export const AuthProvider: FC<AuthProviderProps> = ({ children }) => {
     window.location.href = oktaLoginUrl;
   }, []);
 
+  const logOut = useCallback(async () => {
+    try {
+      await logOutService();
+      setAuthStatus("unauthenticated");
+      setUser(null);
+    } catch (error) {
+      console.error(error);
+    }
+  }, []);
+
   if (authStatus == "loading") {
     return (
       <MessagePage>
@@ -75,7 +88,9 @@ export const AuthProvider: FC<AuthProviderProps> = ({ children }) => {
   }
 
   return (
-    <AuthContext.Provider value={{ redirectToLogin, user, status: authStatus }}>
+    <AuthContext.Provider
+      value={{ redirectToLogin, user, status: authStatus, logOut }}
+    >
       {children}
     </AuthContext.Provider>
   );

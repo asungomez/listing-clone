@@ -2,14 +2,15 @@ import { FC } from "react";
 import { NavLink } from "react-router";
 import { clsx } from "clsx";
 
+export type MenuItem =
+  | { label: string; href: string; onClick?: never }
+  | { label: string; onClick: () => void; href?: never };
+
 type MenuProps = React.DetailedHTMLProps<
   React.HTMLAttributes<HTMLDivElement>,
   HTMLDivElement
 > & {
-  items: {
-    label: string;
-    href: string;
-  }[];
+  items: MenuItem[];
   orientation?: "vertical" | "horizontal";
 };
 
@@ -28,21 +29,34 @@ export const Menu: FC<MenuProps> = ({
         })}
       >
         {items.map((item) => (
-          <li key={item.href}>
-            <NavLink
-              to={item.href}
-              className={({ isActive }) =>
-                clsx(
+          <li key={"href" in item ? item.href : item.label}>
+            {"href" in item ? (
+              <NavLink
+                to={item.href as string}
+                className={({ isActive }) =>
+                  clsx(
+                    "block py-2 px-3 rounded-sm",
+                    isActive
+                      ? "text-blue-500"
+                      : "text-white border-0 hover:text-blue-500"
+                  )
+                }
+                aria-current="page"
+              >
+                {item.label}
+              </NavLink>
+            ) : (
+              <button
+                type="button"
+                onClick={item.onClick}
+                className={clsx(
                   "block py-2 px-3 rounded-sm",
-                  isActive
-                    ? "text-blue-500"
-                    : "text-white border-0 hover:text-blue-500"
-                )
-              }
-              aria-current="page"
-            >
-              {item.label}
-            </NavLink>
+                  "text-white border-0 hover:text-blue-500"
+                )}
+              >
+                {item.label}
+              </button>
+            )}
           </li>
         ))}
       </ul>
