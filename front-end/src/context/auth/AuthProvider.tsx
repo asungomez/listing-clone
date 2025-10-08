@@ -9,6 +9,7 @@ import { MessagePage } from "../../features/MessagePage/MessagePage";
 import { User } from "../../models/user";
 import { useNavigate } from "react-router";
 import { AxiosError } from "axios";
+import { useAlert } from "../alert/AlertContext";
 
 type AuthProviderProps = {
   children: ReactNode;
@@ -18,6 +19,7 @@ export const AuthProvider: FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [authStatus, setAuthStatus] = useState<AuthStatus>("loading");
   const navigate = useNavigate();
+  const { addAlert } = useAlert();
 
   useEffect(() => {
     if (authStatus == "loading") {
@@ -75,6 +77,7 @@ export const AuthProvider: FC<AuthProviderProps> = ({ children }) => {
       setUser(null);
     } catch (error) {
       console.error(error);
+      addAlert("Failed to log out. Please try again.", "danger");
     }
   }, []);
 
