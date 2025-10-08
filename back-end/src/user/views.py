@@ -51,6 +51,25 @@ class LoginView(APIView):
             )
 
 
+class LogoutView(APIView):
+
+    def post(self, request: Request) -> Response:
+        """
+        Logout the user by invalidating the access token and removing the
+        credentials from the cookies.
+        :param request: The request object
+        :return: The response object
+        """
+        token_manager = TokenManager()
+        access_token, _ = token_manager.get_tokens_from_request(request)
+        if access_token is None:
+            return Response(status=status.HTTP_200_OK)
+        token_manager.invalidate_token(access_token)
+        response = Response(status=status.HTTP_200_OK)
+        token_manager.remove_credentials_from_cookies(response)
+        return response
+
+
 class CurrentUserView(AuthenticatedAPIView):
 
     def get(self, request: AuthenticatedRequest) -> Response:

@@ -7,15 +7,17 @@ export type AuthStatus =
   | "loading"; // The authentication process is in progress.
 
 type AuthContextType = {
+  logOut: () => Promise<void>;
   redirectToLogin: () => Promise<void>;
-  user: User | null;
   status: AuthStatus;
+  user: User | null;
 };
 
 export const AuthContext = createContext<AuthContextType>({
+  logOut: async () => {},
   redirectToLogin: async () => {},
-  user: null,
   status: "loading",
+  user: null,
 });
 
 export const useAuth = () => useContext(AuthContext);

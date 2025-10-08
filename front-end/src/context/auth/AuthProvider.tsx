@@ -1,11 +1,15 @@
 import { FC, ReactNode, useCallback, useEffect, useState } from "react";
-import { getAuthenticatedUser } from "../../services/auth";
+import {
+  getAuthenticatedUser,
+  logOut as logOutService,
+} from "../../services/auth";
 import { AuthContext, AuthStatus } from "./AuthContext";
 import { Spinner } from "../../atoms/Spinner/Spinner";
 import { MessagePage } from "../../features/MessagePage/MessagePage";
 import { User } from "../../models/user";
 import { useNavigate } from "react-router";
 import { AxiosError } from "axios";
+import { useAlert } from "../alert/AlertContext";
 
 type AuthProviderProps = {
   children: ReactNode;
@@ -15,6 +19,7 @@ export const AuthProvider: FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [authStatus, setAuthStatus] = useState<AuthStatus>("loading");
   const navigate = useNavigate();
+  const { addAlert } = useAlert();
 
   useEffect(() => {
     if (authStatus == "loading") {
@@ -65,6 +70,18 @@ export const AuthProvider: FC<AuthProviderProps> = ({ children }) => {
     window.location.href = oktaLoginUrl;
   }, []);
 
+  const logOut = useCallback(async () => {
+    try {
+      await logOutService();
+      setAuthStatus("unauthenticated");
+      setUser(null);
+      navigate("/");
+    } catch (error) {
+      console.error(error);
+      addAlert("Failed to log out. Please try again.", "danger");
+    }
+  }, []);
+
   if (authStatus == "loading") {
     return (
       <MessagePage>
@@ -75,7 +92,9 @@ export const AuthProvider: FC<AuthProviderProps> = ({ children }) => {
   }
 
   return (
-    <AuthContext.Provider value={{ redirectToLogin, user, status: authStatus }}>
+    <AuthContext.Provider
+      value={{ redirectToLogin, user, status: authStatus, logOut }}
+    >
       {children}
     </AuthContext.Provider>
   );

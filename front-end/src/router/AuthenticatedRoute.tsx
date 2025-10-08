@@ -1,6 +1,7 @@
 import { FC, useEffect } from "react";
 import { useAuth } from "../context/auth/AuthContext";
 import { Outlet, useNavigate } from "react-router";
+import { NavBar } from "../features/NavBar/NavBar";
 
 /**
  * Route that can only be accessed by authenticated users.
@@ -19,5 +20,10 @@ export const AuthenticatedRoute: FC = () => {
   if (status !== "authenticated") {
     return null;
   }
-  return <Outlet />;
+  return (
+    <>
+      <NavBar />
+      <Outlet />
+    </>
+  );
 };

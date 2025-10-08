@@ -6,7 +6,7 @@ import { FaCheck } from "react-icons/fa";
 import { IoIosClose } from "react-icons/io";
 
 const ALERT_COLORS = ["info", "danger", "success", "warning"] as const;
-type AlertColor = (typeof ALERT_COLORS)[number];
+export type AlertColor = (typeof ALERT_COLORS)[number];
 const ALERT_COLOR_MAP: Record<AlertColor, string> = {
   info: "blue",
   danger: "red",
@@ -56,7 +56,9 @@ export const Alert: FC<AlertProps> = ({
     onDismiss?.();
   };
 
-  return show ? (
+  if (!show) return null;
+
+  return (
     <div
       className={`${alertClasses} p-4 mb-4 border rounded-lg bg-gray-800`}
       role="alert"
@@ -69,10 +71,10 @@ export const Alert: FC<AlertProps> = ({
           <span>{title}</span>
         </div>
         {dismissable && (
-          <div className="flex flex-row items-center align-middle">
+          <div className="flex flex-row items-center align-middle ml-auto">
             <button
               type="button"
-              className={`${buttonClasses} ms-auto ml-3 -mr-1.5 -my-1.5 rounded-lg focus:ring-2 p-1.5  inline-flex items-center justify-center h-8 w-8 bg-gray-800  hover:bg-gray-700`}
+              className={`${buttonClasses} ml-3 -mr-1.5 -my-1.5 rounded-lg focus:ring-2 p-1.5  inline-flex items-center justify-center h-8 w-8 bg-gray-800  hover:bg-gray-700`}
               aria-label="Close"
               onClick={handleDismiss}
             >
@@ -84,5 +86,5 @@ export const Alert: FC<AlertProps> = ({
       </div>
       {children && <div className="text-sm font-normal mt-3">{children}</div>}
     </div>
-  ) : null;
+  );
 };
