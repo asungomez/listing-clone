@@ -79,7 +79,7 @@ def test_logout_failing_okta_revoke(tests_helper: Helper) -> None:
     """
     tests_helper.mock_okta_revoke_response(
         response_body={
-            "message": "Token revoked"
+            "message": "Error"
         },
         response_status=500,
     )
