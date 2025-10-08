@@ -2,9 +2,10 @@ import { FC } from "react";
 import { NavLink } from "react-router";
 import { clsx } from "clsx";
 
+type MenuItemBase = { label: string; disabled?: boolean };
 export type MenuItem =
-  | { label: string; href: string; onClick?: never }
-  | { label: string; onClick: () => void; href?: never };
+  | (MenuItemBase & { href: string; onClick?: never })
+  | (MenuItemBase & { onClick: () => void; href?: never });
 
 type MenuProps = React.DetailedHTMLProps<
   React.HTMLAttributes<HTMLDivElement>,
@@ -36,23 +37,32 @@ export const Menu: FC<MenuProps> = ({
                 className={({ isActive }) =>
                   clsx(
                     "block py-2 px-3 rounded-sm",
-                    isActive
+                    item.disabled
+                      ? "text-gray-400 cursor-not-allowed pointer-events-none"
+                      : isActive
                       ? "text-blue-500"
                       : "text-white border-0 hover:text-blue-500"
                   )
                 }
                 aria-current="page"
+                aria-disabled={item.disabled ?? undefined}
+                onClick={item.disabled ? (e) => e.preventDefault() : undefined}
+                tabIndex={item.disabled ? -1 : undefined}
               >
                 {item.label}
               </NavLink>
             ) : (
               <button
                 type="button"
+                disabled={item.disabled}
                 onClick={item.onClick}
                 className={clsx(
-                  "block py-2 px-3 rounded-sm",
-                  "text-white border-0 hover:text-blue-500"
+                  "block py-2 px-3 rounded-sm cursor-pointer",
+                  item.disabled
+                    ? "text-gray-400 cursor-not-allowed"
+                    : "text-white border-0 hover:text-blue-500"
                 )}
+                aria-disabled={item.disabled ?? undefined}
               >
                 {item.label}
               </button>
