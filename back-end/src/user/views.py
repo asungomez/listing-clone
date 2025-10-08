@@ -1,4 +1,6 @@
-from core.auth import AuthenticatedAPIView, AuthenticatedRequest, TokenManager
+from core.auth import (
+    AdminAPIView, AuthenticatedAPIView, AuthenticatedRequest, TokenManager,
+)
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from rest_framework import status
@@ -9,6 +11,20 @@ from rest_framework.views import APIView
 from .serializers import UserSerializer
 
 User = get_user_model()
+
+
+class CurrentUserView(AuthenticatedAPIView):
+
+    def get(self, request: AuthenticatedRequest) -> Response:
+        return Response({"user": UserSerializer(request.user).data})
+
+
+class ListUsersView(AdminAPIView):
+
+    def get(self, request: AuthenticatedRequest) -> Response:
+        return Response(
+            {"users": UserSerializer(User.objects.all(), many=True).data}
+            )
 
 
 class LoginView(APIView):
@@ -68,9 +84,3 @@ class LogoutView(APIView):
         response = Response(status=status.HTTP_200_OK)
         token_manager.remove_credentials_from_cookies(response)
         return response
-
-
-class CurrentUserView(AuthenticatedAPIView):
-
-    def get(self, request: AuthenticatedRequest) -> Response:
-        return Response({"user": UserSerializer(request.user).data})

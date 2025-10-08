@@ -47,7 +47,7 @@ class UserSerializer(serializers.ModelSerializer[User]):
     def find_by_email(self, email: str) -> User:
         """Find a user by email"""
         lower_email = email.lower()
-        user = self.indexer.search_by_email(lower_email)
+        user = self.indexer.find_by_email(lower_email)
         if not user:
             raise User.DoesNotExist("User not found")
         return user

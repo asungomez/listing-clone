@@ -1,5 +1,5 @@
 from abc import ABC
-from typing import Any, Dict, Generic, List, Type, TypeVar
+from typing import Any, Dict, Generic, List, Optional, Type, TypeVar
 
 import requests
 from app import settings
@@ -15,6 +15,7 @@ class Indexer:
     """
 
     url: str
+    override_types: Optional[Dict[str, str]]
 
     def __init__(self) -> None:
         self.url = f"{settings.SOLR_URL}/{settings.SOLR_CORE}"
@@ -72,7 +73,7 @@ class Indexer:
         for key, value in data.items():
             if key == "id":
                 reverse_transformed_data[key] = value
-            elif key.endswith("_s"):
+            elif key.endswith("_s") or key.endswith("_t"):
                 reverse_transformed_data[key[:-2]] = value
             elif key.endswith("_i"):
                 reverse_transformed_data[key[:-2]] = int(value)
@@ -95,6 +96,8 @@ class Indexer:
                 continue
             if key == "id":
                 transformed_data[key] = value
+            elif self.override_types and key in self.override_types:
+                transformed_data[f"{key}_{self.override_types[key]}"] = value
             elif isinstance(value, str):
                 transformed_data[f"{key}_s"] = value
             elif isinstance(value, int):

@@ -9,7 +9,7 @@ from django.http import HttpRequest
 from django.http.response import HttpResponseBase
 from rest_framework import authentication
 from rest_framework.exceptions import AuthenticationFailed
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.views import APIView
 from user.serializers import UserSerializer
@@ -359,3 +359,7 @@ class AuthenticatedRequest(Request):
 class AuthenticatedAPIView(APIView):
     authentication_classes = [OktaAuthentication]
     permission_classes = [IsAuthenticated]
+
+
+class AdminAPIView(AuthenticatedAPIView):
+    permission_classes = [IsAuthenticated, IsAdminUser]
