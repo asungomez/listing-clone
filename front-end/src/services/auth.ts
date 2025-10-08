@@ -10,5 +10,5 @@ export const getAuthenticatedUser = async (): Promise<User> => {
 };
 
 export const logOut = async (): Promise<void> => {
-  await fetcher.post("/auth/logout");
+  await fetcher.post("/users/logout");
 };

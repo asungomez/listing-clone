@@ -75,6 +75,7 @@ export const AuthProvider: FC<AuthProviderProps> = ({ children }) => {
       await logOutService();
       setAuthStatus("unauthenticated");
       setUser(null);
+      navigate("/");
     } catch (error) {
       console.error(error);
       addAlert("Failed to log out. Please try again.", "danger");

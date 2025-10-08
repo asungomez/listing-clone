@@ -176,6 +176,25 @@ class TokenManager:
             raise ValueError("Access token not found in the response")
         return access_token
 
+    def invalidate_token(self, access_token: str) -> None:
+        """
+        Invalidate the token
+        :param access_token: The access token to invalidate
+        """
+        url = f"{settings.OKTA['DOMAIN']}/oauth/revoke"
+        headers = {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Accept": "application/json",
+        }
+        payload = {
+            "token": access_token,
+            "token_type_hint": "access_token",
+            "client_id": settings.OKTA["CLIENT_ID"],
+            "client_secret": settings.OKTA["CLIENT_SECRET"]
+        }
+        response = requests.post(url, headers=headers, data=payload)
+        response.raise_for_status()
+
     def remove_credentials_from_cookies(
         self,
         response: HttpResponseBase
