@@ -53,11 +53,36 @@ class UserIndexer(ModelIndexer[User]):
             del data["email_ngram"]
         return data
 
-    def search_by_email(self, email: str) -> List[User]:
+    def search_by_email(
+        self,
+        email: str,
+        offset: int,
+        page_size: int,
+    ) -> tuple[List[User], int]:
         """
-        Get all users from the Solr index by email.
+        Search users by email with pagination.
 
-        :param email: The email to search for.
-        :return: The users if found, None otherwise.
+        :param email: The email text to search within.
+        :param offset: The starting offset in the result set.
+        :param page_size: The number of results per page.
+        :return: A tuple (results, total_count).
         """
-        return self.search({"email_ngram": f"*{email}*"})
+        return self.search_paginated(
+            {"email_ngram": email},
+            offset,
+            page_size
+            )
+
+    def all_users(
+        self,
+        offset: int,
+        page_size: int,
+    ) -> tuple[List[User], int]:
+        """
+        Get all users with pagination.
+
+        :param offset: The starting offset in the result set.
+        :param page_size: The number of results per page.
+        :return: A tuple (results, total_count).
+        """
+        return self.search_paginated({}, offset, page_size)

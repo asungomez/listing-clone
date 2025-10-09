@@ -1,7 +1,7 @@
 """
 Serializers for the User API view
 """
-from typing import Any, List
+from typing import Any, List, Tuple
 
 from core.models import User
 from django.contrib.auth import get_user_model
@@ -36,10 +36,6 @@ class UserSerializer(serializers.ModelSerializer[User]):
             )
         read_only_fields = ("id", "email", "username")
 
-    def all_users(self) -> List[User]:
-        """Get all users from the Solr index"""
-        return self.indexer.all()
-
     def create(self, validated_data: dict[str, Any]) -> User:
         """Create and return a new user"""
         try:
@@ -57,8 +53,39 @@ class UserSerializer(serializers.ModelSerializer[User]):
             raise User.DoesNotExist("User not found")
         return user
 
-    def search_by_email(self, email: str) -> List[User]:
-        """Search a list of users by email using full-text search"""
+    def all_users(
+        self,
+        offset: int,
+        page_size: int
+    ) -> Tuple[List[User], int]:
+        """Get paginated users and total count from the Solr index"""
+        users, total = self.indexer.all_users(offset, page_size)
+        return users, total
+
+
+class CurrentUserResponseSerializer(serializers.Serializer):
+    """Response serializer for the current user endpoint."""
+
+    user = UserSerializer()
+
+
+class ListUsersResponseSerializer(serializers.Serializer):
+    """Response serializer for the list users endpoint."""
+
+    users = UserSerializer(many=True)
+    total_count = serializers.IntegerField()
+
+    def search_by_email(
+        self,
+        email: str,
+        offset: int,
+        page_size: int
+    ) -> Tuple[List[User], int]:
+        """Search users by email with pagination and get total count"""
         lower_email = email.lower()
-        users = self.indexer.search_by_email(lower_email)
-        return users
+        users, total = self.indexer.search_by_email(
+            lower_email,
+            offset,
+            page_size
+            )
+        return users, total

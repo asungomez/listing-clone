@@ -10,22 +10,37 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .serializers import UserSerializer
+from .serializers import (
+    CurrentUserResponseSerializer, ListUsersResponseSerializer, UserSerializer,
+)
 
 User = get_user_model()
 
 
 class CurrentUserView(AuthenticatedAPIView):
 
-    @swagger_auto_schema(responses={200: UserSerializer()})
+    @swagger_auto_schema(
+        responses={
+            200: openapi.Response(
+                description="Current user",
+                schema=CurrentUserResponseSerializer(),
+            )
+        }
+    )
     def get(self, request: AuthenticatedRequest) -> Response:
-        return Response({"user": UserSerializer(request.user).data})
+        serializer = CurrentUserResponseSerializer({"user": request.user})
+        return Response(serializer.data)
 
 
 class ListUsersView(AdminAPIView):
 
     @swagger_auto_schema(
-        responses={200: UserSerializer(many=True)},
+        responses={
+            200: openapi.Response(
+                description="List users",
+                schema=ListUsersResponseSerializer(),
+            )
+        },
         manual_parameters=[
             openapi.Parameter(
                 "email",
@@ -34,8 +49,22 @@ class ListUsersView(AdminAPIView):
                 type=openapi.TYPE_STRING,
                 required=False,
             ),
-        ]
-        )
+            openapi.Parameter(
+                "offset",
+                openapi.IN_QUERY,
+                description="Starting index for results (default 0)",
+                type=openapi.TYPE_INTEGER,
+                required=False,
+            ),
+            openapi.Parameter(
+                "page_size",
+                openapi.IN_QUERY,
+                description="Number of results to return (default 25)",
+                type=openapi.TYPE_INTEGER,
+                required=False,
+            ),
+        ],
+    )
     def get(self, request: AuthenticatedRequest) -> Response:
         """
         List users.
@@ -43,11 +72,39 @@ class ListUsersView(AdminAPIView):
         :return: The response object
         """
         email = request.query_params.get("email")
+        try:
+            offset = int(request.query_params.get("offset", 0))
+            page_size = int(request.query_params.get("page_size", 25))
+        except ValueError:
+            return Response(
+                {"message": "offset and page_size must be integers"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if offset < 0:
+            offset = 0
+        if page_size <= 0:
+            page_size = 1
+        if page_size > 100:
+            page_size = 100
+
+        user_serializer = UserSerializer()
         if email is None:
-            users = UserSerializer().all_users()
+            users, total_count = user_serializer.all_users(
+                offset,
+                page_size
+                )
         else:
-            users = UserSerializer().search_by_email(email)
-        return Response({"users": UserSerializer(users, many=True).data})
+            users, total_count = user_serializer.search_by_email(
+                email,
+                offset,
+                page_size
+                )
+        serializer = ListUsersResponseSerializer({
+            "users": users,
+            "total_count": total_count,
+        })
+        return Response(serializer.data)
 
 
 class LoginView(APIView):
