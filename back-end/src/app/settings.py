@@ -212,3 +212,7 @@ LOGGING = {
 # Solr config
 SOLR_URL = env.str("SOLR_URL")
 SOLR_CORE = env.str("SOLR_CORE")
+
+# Pagination config
+DEFAULT_PAGE_SIZE = 25
+MAX_PAGE_SIZE = 100

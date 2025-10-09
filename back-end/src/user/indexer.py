@@ -35,7 +35,7 @@ class UserIndexer(ModelIndexer[User]):
         :param email: The email to search for.
         :return: The user if found, None otherwise.
         """
-        results = self.search({"email": email})
+        results, _ = self.search({"email": email}, page_size=1, offset=0)
         if len(results) == 0:
             return None
         return results[0]
@@ -67,7 +67,7 @@ class UserIndexer(ModelIndexer[User]):
         :param page_size: The number of results per page.
         :return: A tuple (results, total_count).
         """
-        return self.search_paginated(
+        return self.search(
             {"email_ngram": email},
             offset,
             page_size
@@ -85,4 +85,4 @@ class UserIndexer(ModelIndexer[User]):
         :param page_size: The number of results per page.
         :return: A tuple (results, total_count).
         """
-        return self.search_paginated({}, offset, page_size)
+        return self.all(offset, page_size)

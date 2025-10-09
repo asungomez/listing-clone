@@ -6,6 +6,7 @@ from django.contrib.auth import get_user_model
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import status
+from rest_framework.exceptions import ValidationError
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -59,7 +60,10 @@ class ListUsersView(AdminAPIView):
             openapi.Parameter(
                 "page_size",
                 openapi.IN_QUERY,
-                description="Number of results to return (default 25)",
+                description=(
+                    "Number of results to return "
+                    f"(default {settings.DEFAULT_PAGE_SIZE})"
+                    ),
                 type=openapi.TYPE_INTEGER,
                 required=False,
             ),
@@ -74,19 +78,29 @@ class ListUsersView(AdminAPIView):
         email = request.query_params.get("email")
         try:
             offset = int(request.query_params.get("offset", 0))
-            page_size = int(request.query_params.get("page_size", 25))
-        except ValueError:
-            return Response(
-                {"message": "offset and page_size must be integers"},
-                status=status.HTTP_400_BAD_REQUEST,
+            page_size = int(request.query_params.get(
+                "page_size",
+                settings.DEFAULT_PAGE_SIZE
+                )
             )
+        except ValueError:
+            raise ValidationError(
+                "offset and page_size must be integers"
+                )
 
         if offset < 0:
-            offset = 0
+            raise ValidationError(
+                "offset must be greater than or equal to 0"
+                )
         if page_size <= 0:
-            page_size = 1
-        if page_size > 100:
-            page_size = 100
+            raise ValidationError(
+                "page_size must be greater than 0"
+                )
+        if page_size > settings.MAX_PAGE_SIZE:
+            raise ValidationError(
+                "page_size must be less than or equal "
+                f"to {settings.MAX_PAGE_SIZE}"
+                )
 
         user_serializer = UserSerializer()
         if email is None:

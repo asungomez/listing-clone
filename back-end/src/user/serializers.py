@@ -62,6 +62,21 @@ class UserSerializer(serializers.ModelSerializer[User]):
         users, total = self.indexer.all_users(offset, page_size)
         return users, total
 
+    def search_by_email(
+        self,
+        email: str,
+        offset: int,
+        page_size: int
+    ) -> Tuple[List[User], int]:
+        """Search users by email with pagination and get total count"""
+        lower_email = email.lower()
+        users, total = self.indexer.search_by_email(
+            lower_email,
+            offset,
+            page_size
+            )
+        return users, total
+
 
 class CurrentUserResponseSerializer(serializers.Serializer):
     """Response serializer for the current user endpoint."""

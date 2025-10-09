@@ -150,32 +150,13 @@ class ModelIndexer(Indexer, ABC, Generic[GenericModel]):
         data = serializer.data
         self.update(data)
 
-    def all(self) -> List[GenericModel]:
+    def all(self, offset: int, page_size: int) -> List[GenericModel]:
         """
         Get all instances from the Solr index.
         """
-        return self.search({})
+        return self.search({}, offset, page_size)
 
-    def search(self, query: Dict[str, Any]) -> List[GenericModel]:
-        """
-        Search the Solr index for a given query.
-        """
-        if "id" not in query:
-            query["id"] = "*"
-        query_str = self.build_query(query)
-        response = self.select(query_str)
-        docs = response.get("response", {}).get("docs", [])
-        model_cls: Type[GenericModel] = self.serializer_class.Meta.model
-        results: List[GenericModel] = []
-        for doc in docs:
-            transformed_doc = self.reverse_transform_data(doc)
-            serializer = self.serializer_class(data=transformed_doc)
-            if serializer.is_valid():
-                instance = model_cls(**transformed_doc)
-                results.append(instance)
-        return results
-
-    def search_paginated(
+    def search(
         self,
         query: Dict[str, Any],
         offset: int,
