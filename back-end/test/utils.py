@@ -153,6 +153,7 @@ class Helper:
             authenticated_as: Optional[str] = None,
             authentication_method: Literal["header", "cookie"] = "cookie",
             omit_auth_mocking: bool = False,
+            query_params: Optional[Dict[str, Any]] = None,
             ) -> requests.Response:
         """
         Make a request to the API.
@@ -165,6 +166,7 @@ class Helper:
         - "cookie": Authenticate with a cookie
         :param omit_auth_mocking: If True, the authentication mocking will be
         omitted
+        :param query_params: The query parameters to pass to the request
         :return: The response object
         """
         url = f"{self.api_url}{path}"
@@ -184,7 +186,8 @@ class Helper:
             url,
             allow_redirects=False,
             headers=headers,
-            cookies=cookies
+            cookies=cookies,
+            params=query_params
             )
         return response
 
@@ -509,6 +512,9 @@ class Helper:
                 transformed_document[key] = f"{document_type}:{value}"
             elif isinstance(value, str):
                 transformed_document[f"{key}_s"] = value
+                # Ensure user email is indexed for substring search via n-grams
+                if document_type == "user" and key == "email":
+                    transformed_document["email_ngram_ng"] = value
             elif isinstance(value, bool):
                 transformed_document[f"{key}_b"] = value
             elif isinstance(value, int):

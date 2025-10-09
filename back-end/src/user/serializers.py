@@ -1,7 +1,7 @@
 """
 Serializers for the User API view
 """
-from typing import Any
+from typing import Any, List
 
 from core.models import User
 from django.contrib.auth import get_user_model
@@ -32,8 +32,13 @@ class UserSerializer(serializers.ModelSerializer[User]):
             "username",
             "first_name",
             "last_name",
+            "is_superuser",
             )
         read_only_fields = ("id", "email", "username")
+
+    def all_users(self) -> List[User]:
+        """Get all users from the Solr index"""
+        return self.indexer.all()
 
     def create(self, validated_data: dict[str, Any]) -> User:
         """Create and return a new user"""
@@ -51,3 +56,9 @@ class UserSerializer(serializers.ModelSerializer[User]):
         if not user:
             raise User.DoesNotExist("User not found")
         return user
+
+    def search_by_email(self, email: str) -> List[User]:
+        """Search a list of users by email using full-text search"""
+        lower_email = email.lower()
+        users = self.indexer.search_by_email(lower_email)
+        return users

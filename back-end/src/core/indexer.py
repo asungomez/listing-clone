@@ -28,8 +28,16 @@ class Indexer:
         :return: The built query.
         """
         transformed_query = self.transform_data(query)
+
+        def escape_value(value: Any) -> str:
+            if isinstance(value, str):
+                return value.replace(":", r"\:")
+            return str(value)
+
         return "&".join([
-            f"{key}:{value}" for key, value in transformed_query.items()
+            f"{key}:{
+                escape_value(value)
+                }" for key, value in transformed_query.items()
             ])
 
     def update(self, data: Dict[str, Any]) -> None:
@@ -92,7 +100,7 @@ class Indexer:
         """
         transformed_data: Dict[str, Any] = {}
         for key, value in data.items():
-            if not value:
+            if value is None:
                 continue
             if key == "id":
                 transformed_data[key] = value
@@ -100,12 +108,12 @@ class Indexer:
                 transformed_data[f"{key}_{self.override_types[key]}"] = value
             elif isinstance(value, str):
                 transformed_data[f"{key}_s"] = value
+            elif isinstance(value, bool):
+                transformed_data[f"{key}_b"] = value
             elif isinstance(value, int):
                 transformed_data[f"{key}_i"] = value
             elif isinstance(value, float):
                 transformed_data[f"{key}_f"] = value
-            elif isinstance(value, bool):
-                transformed_data[f"{key}_b"] = value
             else:
                 transformed_data[f"{key}_s"] = str(value)
         return transformed_data
@@ -132,10 +140,18 @@ class ModelIndexer(Indexer, ABC, Generic[GenericModel]):
         data = serializer.data
         self.update(data)
 
+    def all(self) -> List[GenericModel]:
+        """
+        Get all instances from the Solr index.
+        """
+        return self.search({})
+
     def search(self, query: Dict[str, Any]) -> List[GenericModel]:
         """
         Search the Solr index for a given query.
         """
+        if "id" not in query:
+            query["id"] = "*"
         query_str = self.build_query(query)
         response = self.select(query_str)
         docs = response.get("response", {}).get("docs", [])

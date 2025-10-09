@@ -1,0 +1,12 @@
+<fieldType name="text_ngram" class="solr.TextField" positionIncrementGap="100">
+  <analyzer type="index">
+    <tokenizer class="solr.StandardTokenizerFactory" />
+    <filter class="solr.LowerCaseFilterFactory" />
+    <filter class="solr.NGramFilterFactory" minGramSize="3" maxGramSize="15" />
+  </analyzer>
+  <analyzer type="query">
+    <tokenizer class="solr.StandardTokenizerFactory" />
+    <filter class="solr.LowerCaseFilterFactory" />
+  </analyzer>
+</fieldType>
+<dynamicField name="*_ng" type="text_ngram" indexed="true" stored="true" multiValued="false" />

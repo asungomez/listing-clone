@@ -10,7 +10,7 @@ class UserIndexer(ModelIndexer[User]):
     """
 
     override_types: Optional[Dict[str, str]] = {
-        "email_text": "t"
+        "email_ngram": "ng"
     }
 
     def __init__(self) -> None:
@@ -23,9 +23,9 @@ class UserIndexer(ModelIndexer[User]):
         """
         serializer = self.serializer_class(instance)
         data = serializer.data
-        # duplicate the field to use as full text search matcher
+        # duplicate the field to use as ngram search matcher
         if "email" in data:
-            data["email_text"] = data["email"]
+            data["email_ngram"] = data["email"]
         self.update(data)
 
     def find_by_email(self, email: str) -> Optional[User]:
@@ -49,8 +49,8 @@ class UserIndexer(ModelIndexer[User]):
         :return: The reverse transformed data.
         """
         data = super().reverse_transform_data(data)
-        if "email_text" in data:
-            del data["email_text"]
+        if "email_ngram" in data:
+            del data["email_ngram"]
         return data
 
     def search_by_email(self, email: str) -> List[User]:
@@ -60,4 +60,4 @@ class UserIndexer(ModelIndexer[User]):
         :param email: The email to search for.
         :return: The users if found, None otherwise.
         """
-        return self.search({"email_text": email})
+        return self.search({"email_ngram": f"*{email}*"})

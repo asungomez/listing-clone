@@ -9,7 +9,7 @@ from django.http import HttpRequest
 from django.http.response import HttpResponseBase
 from rest_framework import authentication
 from rest_framework.exceptions import AuthenticationFailed
-from rest_framework.permissions import IsAdminUser, IsAuthenticated
+from rest_framework.permissions import BasePermission, IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.views import APIView
 from user.serializers import UserSerializer
@@ -361,5 +361,14 @@ class AuthenticatedAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
 
+class IsSuperUser(BasePermission):
+    """
+    Allows access only to admin users.
+    """
+
+    def has_permission(self, request, view):
+        return bool(request.user and request.user.is_superuser)
+
+
 class AdminAPIView(AuthenticatedAPIView):
-    permission_classes = [IsAuthenticated, IsAdminUser]
+    permission_classes = [IsAuthenticated, IsSuperUser]
