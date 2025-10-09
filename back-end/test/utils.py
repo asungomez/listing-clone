@@ -1,6 +1,8 @@
 import json
 import logging
-from typing import Any, Dict, Literal, Mapping, Optional, Sequence, Tuple
+from typing import (
+    Any, Callable, Dict, Literal, Mapping, Optional, Sequence, Tuple,
+)
 
 import psycopg2
 import requests
@@ -8,6 +10,16 @@ from cryptography.fernet import Fernet
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+CUSTOM_SOLR_TRANSFORMATIONS: Dict[
+    str,
+    Callable[[Dict[str, Any]], Dict[str, Any]]
+    ] = {
+        "user": lambda document: {
+            **document,
+            "email_ngram_ng": document.get("email_s")
+        }
+    }
 
 
 class Helper:
@@ -512,14 +524,15 @@ class Helper:
                 transformed_document[key] = f"{document_type}:{value}"
             elif isinstance(value, str):
                 transformed_document[f"{key}_s"] = value
-                # Ensure user email is indexed for substring search via n-grams
-                if document_type == "user" and key == "email":
-                    transformed_document["email_ngram_ng"] = value
             elif isinstance(value, bool):
                 transformed_document[f"{key}_b"] = value
             elif isinstance(value, int):
                 transformed_document[f"{key}_i"] = value
             elif isinstance(value, float):
                 transformed_document[f"{key}_f"] = value
+        if document_type in CUSTOM_SOLR_TRANSFORMATIONS:
+            transformed_document = CUSTOM_SOLR_TRANSFORMATIONS[document_type](
+                transformed_document
+            )
 
         return transformed_document
