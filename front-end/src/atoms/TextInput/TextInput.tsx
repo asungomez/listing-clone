@@ -12,6 +12,7 @@ export type TextInputProps = {
   label?: string;
   onClear?: () => void;
   loading?: boolean;
+  errorMessage?: string;
 } & InputHTMLAttributes<HTMLInputElement>;
 
 export const TextInput: ForwardRefExoticComponent<
@@ -26,6 +27,7 @@ export const TextInput: ForwardRefExoticComponent<
       className,
       onClear,
       loading = false,
+      errorMessage,
       value,
       onInput,
       ...rest
@@ -94,10 +96,18 @@ export const TextInput: ForwardRefExoticComponent<
             type={type}
             onInput={handleInput}
             className={clsx(
-              "bg-gray-700 border border-gray-600 text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 placeholder-gray-400 pr-9",
+              "bg-gray-700 text-white text-sm rounded-lg block w-full p-2.5 placeholder-gray-400 pr-9 border",
+              {
+                "border-red-500 focus:ring-red-500 focus:border-red-500":
+                  !!errorMessage,
+                "border-gray-600 focus:ring-blue-500 focus:border-blue-500":
+                  !errorMessage,
+              },
               className
             )}
             value={value}
+            aria-invalid={Boolean(errorMessage) || undefined}
+            aria-describedby={errorMessage ? `${inputId}-error` : undefined}
             {...rest}
           />
           {loading ? (
@@ -116,6 +126,11 @@ export const TextInput: ForwardRefExoticComponent<
             </button>
           ) : null}
         </div>
+        {errorMessage ? (
+          <p id={`${inputId}-error`} className="mt-1 text-sm text-red-400">
+            {errorMessage}
+          </p>
+        ) : null}
       </div>
     );
   }
