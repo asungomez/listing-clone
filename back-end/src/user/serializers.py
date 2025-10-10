@@ -4,6 +4,7 @@ Serializers for the User API view
 from typing import Any, List, Tuple
 
 from core.models import User
+from core.serializers import PaginationSerializer
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
 from user.indexer import UserIndexer
@@ -104,3 +105,9 @@ class ListUsersResponseSerializer(serializers.Serializer):
             page_size
             )
         return users, total
+
+
+class ListUsersQuerySerializer(PaginationSerializer):
+    """Query params serializer for the list users endpoint."""
+
+    email = serializers.CharField(required=False, allow_blank=True)

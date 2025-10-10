@@ -224,7 +224,9 @@ def test_negative_page_size(tests_helper: Helper) -> None:
     )
     assert response.status_code == 400
     response_body = response.json()
-    assert response_body[0] == "page_size must be greater than 0"
+    page_size_error = response_body.get("page_size")
+    assert page_size_error is not None
+    assert "page_size must be greater than 0" in page_size_error
 
 
 def test_page_size_zero(tests_helper: Helper) -> None:
@@ -244,7 +246,9 @@ def test_page_size_zero(tests_helper: Helper) -> None:
     )
     assert response.status_code == 400
     response_body = response.json()
-    assert response_body[0] == "page_size must be greater than 0"
+    page_size_error = response_body.get("page_size")
+    assert page_size_error is not None
+    assert "page_size must be greater than 0" in page_size_error
 
 
 def test_max_page_size(tests_helper: Helper) -> None:
@@ -264,9 +268,9 @@ def test_max_page_size(tests_helper: Helper) -> None:
     )
     assert response.status_code == 400
     response_body = response.json()
-    assert response_body[0] == (
-        "page_size must be less than or equal to 100"
-        )
+    page_size_error = response_body.get("page_size")
+    assert page_size_error is not None
+    assert "page_size must be less than or equal to 100" in page_size_error
 
 
 def test_offset_defined(tests_helper: Helper) -> None:
@@ -361,7 +365,9 @@ def test_negative_offset(tests_helper: Helper) -> None:
     )
     assert response.status_code == 400
     response_body = response.json()
-    assert response_body[0] == "offset must be greater than or equal to 0"
+    offset_error = response_body.get("offset")
+    assert offset_error is not None
+    assert "offset must be greater than or equal to 0" in offset_error
 
 
 def test_offset_bigger_than_users_count(tests_helper: Helper) -> None:

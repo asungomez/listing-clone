@@ -6,13 +6,13 @@ from django.contrib.auth import get_user_model
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import status
-from rest_framework.exceptions import ValidationError
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .serializers import (
-    CurrentUserResponseSerializer, ListUsersResponseSerializer, UserSerializer,
+    CurrentUserResponseSerializer, ListUsersQuerySerializer,
+    ListUsersResponseSerializer, UserSerializer,
 )
 
 User = get_user_model()
@@ -42,32 +42,7 @@ class ListUsersView(AdminAPIView):
                 schema=ListUsersResponseSerializer(),
             )
         },
-        manual_parameters=[
-            openapi.Parameter(
-                "email",
-                openapi.IN_QUERY,
-                description="Filter users by email",
-                type=openapi.TYPE_STRING,
-                required=False,
-            ),
-            openapi.Parameter(
-                "offset",
-                openapi.IN_QUERY,
-                description="Starting index for results (default 0)",
-                type=openapi.TYPE_INTEGER,
-                required=False,
-            ),
-            openapi.Parameter(
-                "page_size",
-                openapi.IN_QUERY,
-                description=(
-                    "Number of results to return "
-                    f"(default {settings.DEFAULT_PAGE_SIZE})"
-                    ),
-                type=openapi.TYPE_INTEGER,
-                required=False,
-            ),
-        ],
+        query_serializer=ListUsersQuerySerializer,
     )
     def get(self, request: AuthenticatedRequest) -> Response:
         """
@@ -75,32 +50,12 @@ class ListUsersView(AdminAPIView):
         :param request: The request object
         :return: The response object
         """
-        email = request.query_params.get("email")
-        try:
-            offset = int(request.query_params.get("offset", 0))
-            page_size = int(request.query_params.get(
-                "page_size",
-                settings.DEFAULT_PAGE_SIZE
-                )
-            )
-        except ValueError:
-            raise ValidationError(
-                "offset and page_size must be integers"
-                )
-
-        if offset < 0:
-            raise ValidationError(
-                "offset must be greater than or equal to 0"
-                )
-        if page_size <= 0:
-            raise ValidationError(
-                "page_size must be greater than 0"
-                )
-        if page_size > settings.MAX_PAGE_SIZE:
-            raise ValidationError(
-                "page_size must be less than or equal "
-                f"to {settings.MAX_PAGE_SIZE}"
-                )
+        params = ListUsersQuerySerializer(data=request.query_params)
+        # Raise DRF ValidationError with our custom error messages
+        params.is_valid(raise_exception=True)
+        email = params.validated_data.get("email")
+        offset = params.validated_data["offset"]
+        page_size = params.validated_data["page_size"]
 
         user_serializer = UserSerializer()
         if email is None:
