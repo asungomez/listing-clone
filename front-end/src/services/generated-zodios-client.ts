@@ -27,7 +27,7 @@ const endpoints = makeApi([
   {
     method: "get",
     path: "/accounts/login/",
-    alias: "accounts_login_list",
+    alias: "redirect_to_login",
     description: `Redirect to the login page. This endpoint is only used for the Swagger
 UI.`,
     requestFormat: "json",
@@ -70,7 +70,7 @@ UI.`,
   {
     method: "get",
     path: "/users/login-callback",
-    alias: "users_login-callback_list",
+    alias: "login_callback",
     requestFormat: "json",
     parameters: [
       {
@@ -96,7 +96,7 @@ UI.`,
   {
     method: "post",
     path: "/users/logout",
-    alias: "users_logout_create",
+    alias: "logout",
     description: `Logout the user by invalidating the access token and removing the
 credentials from the cookies.
 :param request: The request object

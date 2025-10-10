@@ -101,7 +101,8 @@ class LoginView(APIView):
                 type=openapi.TYPE_STRING,
                 required=True,
             ),
-        ]
+        ],
+        operation_id="login_callback"
     )
     def get(self, request: Request) -> Response:
         code = request.query_params.get("code")
@@ -155,7 +156,8 @@ class LogoutView(APIView):
         responses={200: openapi.Response(
             description="Logout the user",
             type=openapi.TYPE_STRING,
-        )}
+        )},
+        operation_id="logout"
     )
     def post(self, request: Request) -> Response:
         """
@@ -180,7 +182,8 @@ class RedirectToLoginView(APIView):
         responses={302: openapi.Response(
             description="Redirect to the login page",
             type=openapi.TYPE_STRING,
-        )}
+        )},
+        operation_id="redirect_to_login"
     )
     def get(self, _: Request) -> Response:
         """

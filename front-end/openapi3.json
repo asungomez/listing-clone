@@ -24,7 +24,7 @@
     "paths": {
         "/accounts/login/": {
             "get": {
-                "operationId": "accounts_login_list",
+                "operationId": "redirect_to_login",
                 "description": "Redirect to the login page. This endpoint is only used for the Swagger\nUI.",
                 "responses": {
                     "200": {
@@ -96,7 +96,7 @@
         },
         "/users/login-callback": {
             "get": {
-                "operationId": "users_login-callback_list",
+                "operationId": "login_callback",
                 "description": "",
                 "parameters": [
                     {
@@ -135,7 +135,7 @@
         },
         "/users/logout": {
             "post": {
-                "operationId": "users_logout_create",
+                "operationId": "logout",
                 "description": "Logout the user by invalidating the access token and removing the\ncredentials from the cookies.\n:param request: The request object\n:return: The response object",
                 "responses": {
                     "200": {
