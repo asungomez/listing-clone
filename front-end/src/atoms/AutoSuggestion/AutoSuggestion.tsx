@@ -29,6 +29,7 @@ export const AutoSuggestion = <T,>({
 }: AutoSuggestionProps<T>) => {
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
+  const [suppressOpen, setSuppressOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
@@ -38,18 +39,22 @@ export const AutoSuggestion = <T,>({
   );
 
   useEffect(() => {
-    // Open when there's any text; close only if suggestions list is empty
+    if (suppressOpen) {
+      setOpen(false);
+      return;
+    }
     if (search.length > 0) {
       setOpen(suggestions.length > 0);
     } else {
       setOpen(false);
     }
-  }, [suggestions, search]);
+  }, [suggestions, search, suppressOpen]);
 
   // Sync input text from controlled selected value when it changes (if provided)
   useEffect(() => {
     if (value && value.label !== search) {
       setSearch(value.label);
+      setSuppressOpen(true);
     }
     // If value becomes null, keep whatever the user typed
   }, [value]);
@@ -57,6 +62,7 @@ export const AutoSuggestion = <T,>({
   const handlePick = (item: SuggestionItem<T>) => {
     setSearch(item.label);
     setOpen(false);
+    setSuppressOpen(true);
     onChange(item);
   };
 
@@ -64,12 +70,22 @@ export const AutoSuggestion = <T,>({
     e: FormEvent<HTMLInputElement>
   ) => {
     setSearch(e.currentTarget.value);
+    setSuppressOpen(false);
     if (typeof onInput === "function") onInput(e);
   };
 
   const handleFocus: NonNullable<typeof onFocus> = (e) => {
-    setOpen(suggestions.length > 0 && search.length > 0);
+    if (!suppressOpen) {
+      setOpen(suggestions.length > 0 && search.length > 0);
+    }
     if (typeof onFocus === "function") onFocus(e);
+  };
+
+  const handleClear = () => {
+    setSearch("");
+    setOpen(false);
+    setSuppressOpen(false);
+    if (value) onChange(null);
   };
 
   return (
@@ -81,6 +97,7 @@ export const AutoSuggestion = <T,>({
         value={search}
         onInput={handleInput}
         onFocus={handleFocus}
+        onClear={handleClear}
       />
       <div className="relative">
         <Dropdown
