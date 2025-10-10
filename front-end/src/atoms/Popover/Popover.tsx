@@ -24,6 +24,11 @@ type PopoverProps = {
   className?: string;
   children: ReactNode;
   showArrow?: boolean;
+  onClose?: () => void; // called on Escape or other dismiss events Popover handles
+  role?: "dialog" | "menu" | "listbox" | "tooltip";
+  ariaLabel?: string;
+  ariaLabelledBy?: string;
+  returnFocus?: boolean; // focus anchor when unmounting
 };
 
 type PopoverComponent = ForwardRefExoticComponent<
@@ -34,6 +39,7 @@ type PopoverComponent = ForwardRefExoticComponent<
 
 const ARROW_SIZE_PX = 10; // visual size of the diamond (width/height)
 const OFFSET_PX = 8; // gap between anchor and popover panel
+const MAX_HEIGHT_VH = 60; // clamp panel height to viewport
 const SCREEN_MARGIN_PX = 8; // min distance to viewport edges
 
 const clamp = (value: number, min: number, max: number) =>
@@ -108,7 +114,22 @@ const ARROW_BORDER_POSITIONING_CLASSES: Record<PopoverSide, string> = {
 };
 
 const PopoverImpl = forwardRef<HTMLDivElement, PopoverProps>(
-  ({ anchor, open, position, className, children, showArrow = true }, ref) => {
+  (
+    {
+      anchor,
+      open,
+      position,
+      className,
+      children,
+      showArrow = true,
+      onClose,
+      role = "dialog",
+      ariaLabel,
+      ariaLabelledBy,
+      returnFocus = true,
+    },
+    ref
+  ) => {
     const internalPanelRef = useRef<HTMLDivElement | null>(null);
     const [coords, setCoords] = useState<{
       top: number;
@@ -116,6 +137,7 @@ const PopoverImpl = forwardRef<HTMLDivElement, PopoverProps>(
       side: PopoverSide;
       arrowOffset?: { left?: number; top?: number };
     } | null>(null);
+    const computedLabelledBy = useRef<string | undefined>(undefined);
 
     // No parsing of children: simply render them. Use <Popover.Title> for a header.
 
@@ -210,10 +232,36 @@ const PopoverImpl = forwardRef<HTMLDivElement, PopoverProps>(
         anchorEl && ro.observe(anchorEl);
         panelEl && ro.observe(panelEl);
       }
+      // Escape-to-close
+      const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === "Escape") {
+          onClose?.();
+        }
+      };
+      document.addEventListener("keydown", handleKeyDown, true);
+
+      // Compute aria-labelledby from Title if not provided
+      if (!ariaLabelledBy && panelEl) {
+        const titleEl = panelEl.querySelector(
+          "[data-popover-title]"
+        ) as HTMLElement | null;
+        if (titleEl) {
+          if (!titleEl.id) {
+            titleEl.id = `popover-title-${Math.random().toString(36).slice(2)}`;
+          }
+          computedLabelledBy.current = titleEl.id;
+        }
+      }
       return () => {
         window.removeEventListener("resize", handle);
         window.removeEventListener("scroll", handle, true);
         ro?.disconnect();
+        document.removeEventListener("keydown", handleKeyDown, true);
+        // Return focus to anchor on unmount
+        if (returnFocus) {
+          const a = getAnchorElement(anchor);
+          a?.focus?.();
+        }
       };
     }, [open, recalc]);
 
@@ -255,9 +303,12 @@ const PopoverImpl = forwardRef<HTMLDivElement, PopoverProps>(
       }
     };
 
+    const panelMaxHeight = Math.round(
+      (window.innerHeight * MAX_HEIGHT_VH) / 100
+    );
     const panel = (
       <div
-        role="tooltip"
+        role={role}
         ref={setPanelRefs}
         className={clsx(
           "absolute z-50 inline-block text-sm transition-opacity duration-300",
@@ -265,8 +316,16 @@ const PopoverImpl = forwardRef<HTMLDivElement, PopoverProps>(
           coords ? "opacity-100 visible" : "opacity-0 invisible",
           className
         )}
-        style={{ top: coords?.top, left: coords?.left }}
+        style={{
+          top: coords?.top,
+          left: coords?.left,
+          maxHeight: panelMaxHeight,
+        }}
         aria-hidden={!coords}
+        aria-label={ariaLabel}
+        aria-labelledby={
+          ariaLabel ? undefined : ariaLabelledBy ?? computedLabelledBy.current
+        }
       >
         {children}
         {showArrow ? (
