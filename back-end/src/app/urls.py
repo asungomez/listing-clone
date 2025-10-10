@@ -20,6 +20,11 @@ urlpatterns = [
         schema_view.with_ui('swagger', cache_timeout=0),
         name='schema-swagger-ui'
         ),
+    path(
+        "openapi/",
+        schema_view.without_ui(cache_timeout=0),
+        name='schema-json'
+        ),
     path("admin/", admin.site.urls),
     path("users/", include("user.urls")),
     path("accounts/", include("user.account_urls"))

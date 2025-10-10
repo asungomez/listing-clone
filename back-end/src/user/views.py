@@ -26,7 +26,8 @@ class CurrentUserView(AuthenticatedAPIView):
                 description="Current user",
                 schema=CurrentUserResponseSerializer(),
             )
-        }
+        },
+        operation_id="users_me"
     )
     def get(self, request: AuthenticatedRequest) -> Response:
         serializer = CurrentUserResponseSerializer({"user": request.user})

@@ -1,0 +1,262 @@
+{
+    "openapi": "3.0.0",
+    "x-origin": [
+        {
+            "url": "http://localhost:8000/openapi",
+            "format": "swagger",
+            "version": "2.0",
+            "converter": {
+                "url": "https://github.com/mermade/oas-kit",
+                "version": "7.0.8"
+            }
+        }
+    ],
+    "info": {
+        "title": "My Listings API",
+        "description": "My Listings API",
+        "version": "v1"
+    },
+    "security": [
+        {
+            "Basic": []
+        }
+    ],
+    "paths": {
+        "/accounts/login/": {
+            "get": {
+                "operationId": "accounts_login_list",
+                "description": "Redirect to the login page. This endpoint is only used for the Swagger\nUI.",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    },
+                    "302": {
+                        "description": "Redirect to the login page",
+                        "type": "string"
+                    }
+                },
+                "tags": [
+                    "accounts"
+                ]
+            },
+            "parameters": []
+        },
+        "/users/": {
+            "get": {
+                "operationId": "users_list",
+                "description": "List users.\n:param request: The request object\n:return: The response object",
+                "parameters": [
+                    {
+                        "name": "offset",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "default": 0
+                        }
+                    },
+                    {
+                        "name": "page_size",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 100,
+                            "default": 25
+                        }
+                    },
+                    {
+                        "name": "email",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List users",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ListUsersResponse"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "users"
+                ]
+            },
+            "parameters": []
+        },
+        "/users/login-callback": {
+            "get": {
+                "operationId": "users_login-callback_list",
+                "description": "",
+                "parameters": [
+                    {
+                        "name": "code",
+                        "in": "query",
+                        "description": "Code from the OAuth provider",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "state",
+                        "in": "query",
+                        "description": "State from the OAuth provider",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    },
+                    "302": {
+                        "description": "Redirect to the login page",
+                        "type": "string"
+                    }
+                },
+                "tags": [
+                    "users"
+                ]
+            },
+            "parameters": []
+        },
+        "/users/logout": {
+            "post": {
+                "operationId": "users_logout_create",
+                "description": "Logout the user by invalidating the access token and removing the\ncredentials from the cookies.\n:param request: The request object\n:return: The response object",
+                "responses": {
+                    "200": {
+                        "description": "Logout the user",
+                        "type": "string"
+                    }
+                },
+                "tags": [
+                    "users"
+                ]
+            },
+            "parameters": []
+        },
+        "/users/me": {
+            "get": {
+                "operationId": "users_me",
+                "description": "",
+                "responses": {
+                    "200": {
+                        "description": "Current user",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CurrentUserResponse"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "users"
+                ]
+            },
+            "parameters": []
+        }
+    },
+    "servers": [
+        {
+            "url": "http://localhost:8000"
+        }
+    ],
+    "components": {
+        "securitySchemes": {
+            "Basic": {
+                "type": "http",
+                "scheme": "basic"
+            }
+        },
+        "schemas": {
+            "User": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "title": "ID",
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "email": {
+                        "title": "Email",
+                        "type": "string",
+                        "format": "email",
+                        "readOnly": true,
+                        "minLength": 1
+                    },
+                    "username": {
+                        "title": "Username",
+                        "type": "string",
+                        "readOnly": true,
+                        "minLength": 1
+                    },
+                    "first_name": {
+                        "title": "First name",
+                        "type": "string",
+                        "maxLength": 255,
+                        "minLength": 1,
+                        "nullable": true
+                    },
+                    "last_name": {
+                        "title": "Last name",
+                        "type": "string",
+                        "maxLength": 255,
+                        "minLength": 1,
+                        "nullable": true
+                    },
+                    "is_superuser": {
+                        "title": "Superuser status",
+                        "description": "Designates that this user has all permissions without explicitly assigning them.",
+                        "type": "boolean"
+                    }
+                }
+            },
+            "ListUsersResponse": {
+                "required": [
+                    "users",
+                    "total_count"
+                ],
+                "type": "object",
+                "properties": {
+                    "users": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/User"
+                        }
+                    },
+                    "total_count": {
+                        "title": "Total count",
+                        "type": "integer"
+                    }
+                }
+            },
+            "CurrentUserResponse": {
+                "required": [
+                    "user"
+                ],
+                "type": "object",
+                "properties": {
+                    "user": {
+                        "$ref": "#/components/schemas/User"
+                    }
+                }
+            }
+        }
+    }
+}

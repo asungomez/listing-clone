@@ -7,18 +7,24 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "generate-api-client": "npx swagger2openapi http://localhost:8000/openapi -o ./openapi3.json &&     npx openapi-zod-client ./openapi3.json -o ./src/services/generated-zodios-client.ts"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.0.15",
-    "axios": "^1.8.4",
+    "@tanstack/react-query": "^5.90.2",
+    "@zodios/core": "^10.9.6",
+    "@zodios/react": "^10.4.5",
+    "axios": "^1.12.2",
     "clsx": "^2.1.1",
     "qs": "^6.14.0",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
     "react-icons": "^5.5.0",
     "react-router": "^7.4.0",
-    "tailwindcss": "^4.0.15"
+    "swr": "^2.3.6",
+    "tailwindcss": "^4.0.15",
+    "zod": "^4.1.12"
   },
   "devDependencies": {
     "@eslint/js": "^9.21.0",

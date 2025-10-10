@@ -6,7 +6,7 @@ import {
 import { AuthContext, AuthStatus } from "./AuthContext";
 import { Spinner } from "../../atoms/Spinner/Spinner";
 import { MessagePage } from "../../features/MessagePage/MessagePage";
-import { User } from "../../models/user";
+import { GetAuthenticatedUserResponse } from "../../services/auth";
 import { useNavigate } from "react-router";
 import { AxiosError } from "axios";
 import { useAlert } from "../alert/AlertContext";
@@ -16,7 +16,7 @@ type AuthProviderProps = {
 };
 
 export const AuthProvider: FC<AuthProviderProps> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<GetAuthenticatedUserResponse | null>(null);
   const [authStatus, setAuthStatus] = useState<AuthStatus>("loading");
   const navigate = useNavigate();
   const { addAlert } = useAlert();
