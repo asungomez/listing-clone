@@ -44,11 +44,11 @@ export const AutoSuggestion = <T,>({
       return;
     }
     if (search.length > 0) {
-      setOpen(suggestions.length > 0);
+      setOpen(true); // show dropdown even if no results, to display empty state
     } else {
       setOpen(false);
     }
-  }, [suggestions, search, suppressOpen]);
+  }, [search, suppressOpen]);
 
   // Sync input text from controlled selected value when it changes (if provided)
   useEffect(() => {
@@ -107,18 +107,24 @@ export const AutoSuggestion = <T,>({
           className="mt-1"
         >
           <ul className="max-h-60 overflow-auto rounded-md bg-gray-700 border border-gray-600 text-white shadow-lg">
-            {suggestions.map((s, idx) => (
-              <li
-                key={`${s.label}-${idx}`}
-                className="px-3 py-2 cursor-pointer hover:bg-gray-600"
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  handlePick(s);
-                }}
-              >
-                {s.label}
+            {suggestions.length > 0 ? (
+              suggestions.map((s, idx) => (
+                <li
+                  key={`${s.label}-${idx}`}
+                  className="px-3 py-2 cursor-pointer hover:bg-gray-600"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    handlePick(s);
+                  }}
+                >
+                  {s.label}
+                </li>
+              ))
+            ) : (
+              <li className="px-3 py-2 text-gray-400 select-none">
+                No results
               </li>
-            ))}
+            )}
           </ul>
         </Dropdown>
       </div>
