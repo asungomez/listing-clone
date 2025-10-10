@@ -156,7 +156,7 @@ export const AutoSuggestion = <T,>({
                   {s.label}
                 </li>
               ))
-            ) : (
+            ) : loading ? null : (
               <li className="px-3 py-2 text-gray-400 select-none">
                 No results
               </li>
