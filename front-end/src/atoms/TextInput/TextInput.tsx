@@ -6,10 +6,12 @@ import type {
   RefAttributes,
 } from "react";
 import clsx from "clsx";
+import { Spinner } from "../Spinner/Spinner";
 
 export type TextInputProps = {
   label?: string;
   onClear?: () => void;
+  loading?: boolean;
 } & InputHTMLAttributes<HTMLInputElement>;
 
 export const TextInput: ForwardRefExoticComponent<
@@ -23,6 +25,7 @@ export const TextInput: ForwardRefExoticComponent<
       type = "text",
       className,
       onClear,
+      loading = false,
       value,
       onInput,
       ...rest
@@ -97,7 +100,12 @@ export const TextInput: ForwardRefExoticComponent<
             value={value}
             {...rest}
           />
-          {hasValue ? (
+          {loading ? (
+            <Spinner
+              className="absolute right-2 top-1/2 -translate-y-1/2"
+              size={16}
+            />
+          ) : hasValue ? (
             <button
               type="button"
               aria-label="Clear input"

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { FormEvent, InputHTMLAttributes } from "react";
 import clsx from "clsx";
 import { TextInput } from "../TextInput/TextInput";
@@ -12,7 +12,9 @@ export type AutoSuggestionProps<T = unknown> = Omit<
 > & {
   label?: string;
   className?: string;
-  suggestionsGenerator: (search: string) => SuggestionItem<T>[];
+  suggestionsGenerator: (
+    search: string
+  ) => SuggestionItem<T>[] | Promise<SuggestionItem<T>[]>;
   value?: SuggestionItem<T> | null; // controlled selected item
   onChange: (item: SuggestionItem<T> | null) => void; // fired when a suggestion is picked
 };
@@ -33,10 +35,34 @@ export const AutoSuggestion = <T,>({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
-  const suggestions = useMemo(
-    () => suggestionsGenerator(search),
-    [search, suggestionsGenerator]
-  );
+  const [suggestions, setSuggestions] = useState<SuggestionItem<T>[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      const result = suggestionsGenerator(search);
+      if (result instanceof Promise) {
+        setLoading(true);
+        try {
+          const data = await result;
+          if (!cancelled) setSuggestions(data);
+        } finally {
+          if (!cancelled) setLoading(false);
+        }
+      } else {
+        setSuggestions(result);
+      }
+    };
+    if (search.length > 0) run();
+    else {
+      setSuggestions([]);
+      setLoading(false);
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [search, suggestionsGenerator]);
 
   useEffect(() => {
     if (suppressOpen) {
@@ -98,6 +124,7 @@ export const AutoSuggestion = <T,>({
         onInput={handleInput}
         onFocus={handleFocus}
         onClear={handleClear}
+        loading={loading}
       />
       <div className="relative">
         <Dropdown

@@ -20,8 +20,9 @@ export const UserMenu: FC = () => {
       "admin@example.com",
       "support@example.com",
     ];
-    return (search: string): SuggestionItem<string>[] => {
+    return async (search: string): Promise<SuggestionItem<string>[]> => {
       const q = search.trim().toLowerCase();
+      await new Promise((r) => setTimeout(r, 500));
       const matched = q
         ? base.filter((e) => e.toLowerCase().includes(q))
         : base;
