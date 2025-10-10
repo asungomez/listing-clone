@@ -17,6 +17,7 @@ export type AutoSuggestionProps<T = unknown> = Omit<
   ) => SuggestionItem<T>[] | Promise<SuggestionItem<T>[]>;
   value?: SuggestionItem<T> | null; // controlled selected item
   onChange: (item: SuggestionItem<T> | null) => void; // fired when a suggestion is picked
+  debounceMs?: number; // delay before firing generator
 };
 
 export const AutoSuggestion = <T,>({
@@ -27,6 +28,7 @@ export const AutoSuggestion = <T,>({
   onChange,
   onFocus,
   onInput,
+  debounceMs = 250,
   ...inputProps
 }: AutoSuggestionProps<T>) => {
   const [search, setSearch] = useState("");
@@ -37,11 +39,18 @@ export const AutoSuggestion = <T,>({
 
   const [suggestions, setSuggestions] = useState<SuggestionItem<T>[]>([]);
   const [loading, setLoading] = useState(false);
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  // Debounce the raw search input
+  useEffect(() => {
+    const handle = setTimeout(() => setDebouncedSearch(search), debounceMs);
+    return () => clearTimeout(handle);
+  }, [search, debounceMs]);
 
   useEffect(() => {
     let cancelled = false;
     const run = async () => {
-      const result = suggestionsGenerator(search);
+      const result = suggestionsGenerator(debouncedSearch);
       if (result instanceof Promise) {
         setLoading(true);
         try {
@@ -54,7 +63,7 @@ export const AutoSuggestion = <T,>({
         setSuggestions(result);
       }
     };
-    if (search.length > 0) run();
+    if (debouncedSearch.length > 0) run();
     else {
       setSuggestions([]);
       setLoading(false);
@@ -62,7 +71,7 @@ export const AutoSuggestion = <T,>({
     return () => {
       cancelled = true;
     };
-  }, [search, suggestionsGenerator]);
+  }, [debouncedSearch, suggestionsGenerator]);
 
   useEffect(() => {
     if (suppressOpen) {
