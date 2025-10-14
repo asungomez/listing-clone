@@ -69,3 +69,26 @@ class User(AbstractBaseUser, PermissionsMixin):
     objects = UserManager()
 
     USERNAME_FIELD = "username"
+
+
+class UpdatedBy(models.Model):
+    """Updated by"""
+
+    """The user that updated the model"""
+    updated_by = models.ForeignKey(User, on_delete=models.DO_NOTHING)
+
+    """The date and time the model was updated"""
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        abstract = True
+
+
+class Listing(UpdatedBy):
+    """Listing in the system"""
+
+    """The title of the listing"""
+    title = models.CharField(max_length=255)
+
+    """The description of the listing"""
+    description = models.TextField()
