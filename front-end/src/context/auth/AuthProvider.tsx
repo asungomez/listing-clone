@@ -1,8 +1,12 @@
-import { FC, ReactNode, useCallback, useEffect, useState } from "react";
 import {
-  getAuthenticatedUser,
-  logOut as logOutService,
-} from "../../services/auth";
+  FC,
+  ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+import { logOut as logOutService } from "../../services/auth";
 import { AuthContext, AuthStatus } from "./AuthContext";
 import { Spinner } from "../../atoms/Spinner/Spinner";
 import { MessagePage } from "../../features/MessagePage/MessagePage";
@@ -10,24 +14,31 @@ import { GetAuthenticatedUserResponse } from "../../services/auth";
 import { useNavigate } from "react-router";
 import { AxiosError } from "axios";
 import { useAlert } from "../alert/AlertContext";
+import { useGetCurrentUser } from "../../hooks/useGetCurrentUser";
 
 type AuthProviderProps = {
   children: ReactNode;
 };
 
 export const AuthProvider: FC<AuthProviderProps> = ({ children }) => {
-  const [user, setUser] = useState<GetAuthenticatedUserResponse | null>(null);
+  const [authenticatedUser, setAuthenticatedUser] =
+    useState<GetAuthenticatedUserResponse | null>(null);
+  const [mockSessionUser, setMockSessionUser] =
+    useState<GetAuthenticatedUserResponse | null>(null);
   const [authStatus, setAuthStatus] = useState<AuthStatus>("loading");
   const navigate = useNavigate();
   const { addAlert } = useAlert();
+  const getCurrentUser = useGetCurrentUser();
 
   useEffect(() => {
     if (authStatus == "loading") {
-      getAuthenticatedUser()
+      getCurrentUser()
         .then((user) => {
-          setUser(user);
-          setAuthStatus("authenticated");
-          navigate("/my-listings");
+          if (user) {
+            setAuthenticatedUser(user);
+            setAuthStatus("authenticated");
+            navigate("/my-listings");
+          }
         })
         .catch((error) => {
           let errorMessage: string | undefined = undefined;
@@ -74,13 +85,41 @@ export const AuthProvider: FC<AuthProviderProps> = ({ children }) => {
     try {
       await logOutService();
       setAuthStatus("unauthenticated");
-      setUser(null);
+      setAuthenticatedUser(null);
       navigate("/");
     } catch (error) {
       console.error(error);
       addAlert("Failed to log out. Please try again.", "danger");
     }
   }, []);
+
+  const startMockingSession = useCallback(
+    (user: GetAuthenticatedUserResponse) => {
+      setMockSessionUser(user);
+    },
+    []
+  );
+
+  const stopMockingSession = useCallback(() => {
+    setMockSessionUser(null);
+  }, []);
+
+  const isAdmin = useMemo(() => {
+    if (mockSessionUser) {
+      return !!mockSessionUser.is_superuser;
+    }
+    if (authenticatedUser) {
+      return !!authenticatedUser.is_superuser;
+    }
+    return false;
+  }, [mockSessionUser, authenticatedUser]);
+
+  const user = useMemo(() => {
+    if (mockSessionUser) {
+      return mockSessionUser;
+    }
+    return authenticatedUser;
+  }, [mockSessionUser, authenticatedUser]);
 
   if (authStatus == "loading") {
     return (
@@ -91,11 +130,19 @@ export const AuthProvider: FC<AuthProviderProps> = ({ children }) => {
     );
   }
 
-  const isAdmin = user?.is_superuser ?? false;
-
   return (
     <AuthContext.Provider
-      value={{ redirectToLogin, user, status: authStatus, logOut, isAdmin }}
+      value={{
+        redirectToLogin,
+        user,
+        authenticatedUser,
+        status: authStatus,
+        logOut,
+        isAdmin,
+        mockSessionUser,
+        startMockingSession,
+        stopMockingSession,
+      }}
     >
       {children}
     </AuthContext.Provider>

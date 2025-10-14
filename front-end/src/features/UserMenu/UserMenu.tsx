@@ -6,27 +6,42 @@ import {
   SuggestionItem,
 } from "../../atoms/AutoSuggestion/AutoSuggestion";
 import { useSearchUsers } from "../../hooks/useSearchUsers";
+import { ListUsersResponse } from "../../services/admin";
 
 const SEARCH_RESULTS_LIMIT = 5;
 
+type SuggestedUser = ListUsersResponse[number];
+
 export const UserMenu: FC = () => {
-  const { logOut, isAdmin } = useAuth();
+  const {
+    logOut,
+    startMockingSession,
+    authenticatedUser,
+    stopMockingSession,
+    mockSessionUser,
+  } = useAuth();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [selectedUser, setSelectedUser] =
-    useState<SuggestionItem<string> | null>(null);
-  const { searchUsers } = useSearchUsers(SEARCH_RESULTS_LIMIT);
+    useState<SuggestionItem<SuggestedUser> | null>(
+      mockSessionUser
+        ? {
+            label: mockSessionUser?.email ?? "",
+            value: mockSessionUser,
+          }
+        : null
+    );
+  const { searchUsers } = useSearchUsers(SEARCH_RESULTS_LIMIT, {
+    actAsMockedUser: false,
+  });
 
   const emailSuggestions = useCallback(
-    async (search: string): Promise<SuggestionItem<string>[]> => {
-      const list = await searchUsers(search);
-      const suggestions = list
-        .map((u) => u.email)
-        .filter((e): e is string => Boolean(e))
-        .map((e) => ({ label: e, value: e }));
-      const uniqueByLabel = Array.from(
-        new Map(suggestions.map((s) => [s.label.toLowerCase(), s])).values()
-      );
-      return uniqueByLabel;
+    async (search: string): Promise<SuggestionItem<SuggestedUser>[]> => {
+      const list = (await searchUsers(search)) ?? [];
+      const suggestions = list.map((e) => ({
+        label: e.email ?? "",
+        value: e,
+      }));
+      return suggestions;
     },
     [searchUsers]
   );
@@ -40,6 +55,21 @@ export const UserMenu: FC = () => {
       setIsLoggingOut(false);
     }
   }, [logOut, isLoggingOut]);
+
+  const handleSwitchUser = useCallback(
+    async (user: SuggestionItem<SuggestedUser> | null) => {
+      if (user && user.value.id !== authenticatedUser?.id) {
+        startMockingSession(user.value);
+        setSelectedUser({
+          label: user.value.email ?? "",
+          value: user.value,
+        });
+      } else {
+        stopMockingSession();
+      }
+    },
+    [startMockingSession, stopMockingSession, authenticatedUser]
+  );
 
   const menuItems: MenuItem[] = useMemo(
     () => [
@@ -55,14 +85,14 @@ export const UserMenu: FC = () => {
   );
   return (
     <>
-      {isAdmin && (
+      {authenticatedUser?.is_superuser && (
         <div className="px-1 pb-2">
-          <AutoSuggestion<string>
+          <AutoSuggestion<SuggestedUser>
             label="Switch user"
             placeholder="Type an email..."
             autoComplete="off"
             value={selectedUser}
-            onChange={setSelectedUser}
+            onChange={handleSwitchUser}
             suggestionsGenerator={emailSuggestions}
           />
         </div>

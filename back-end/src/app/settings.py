@@ -15,6 +15,7 @@ from datetime import timedelta
 from pathlib import Path
 
 import environ  # type: ignore
+from corsheaders.defaults import default_headers
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -81,7 +82,11 @@ else:
     CORS_ALLOWED_ORIGINS = env.list("ALLOWED_ORIGINS")
 
 CORS_ALLOW_CREDENTIALS = True
-
+CUSTOM_HEADER_MOCK_SESSION_USER_ID = "mock-session-user-id"
+CORS_ALLOW_HEADERS = (
+    *default_headers,
+    CUSTOM_HEADER_MOCK_SESSION_USER_ID,
+)
 
 # Application definition
 

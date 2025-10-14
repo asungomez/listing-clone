@@ -1,6 +1,7 @@
 import json
 from typing import Callable, Optional, Tuple
 
+import app.settings as app_settings
 import requests
 from core.crypto import Crypto
 from core.models import User
@@ -282,7 +283,7 @@ class OktaAuthentication(authentication.BaseAuthentication):
                 setattr(base_request, "auth_tokens_to_set", (at, rt))
 
             mock_session_user_id = base_request.headers.get(
-                "Mock-Session-User-Id"
+                app_settings.CUSTOM_HEADER_MOCK_SESSION_USER_ID
                 )
             if mock_session_user_id:
                 if not user.is_superuser:

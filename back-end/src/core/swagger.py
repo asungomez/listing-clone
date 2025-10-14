@@ -1,5 +1,6 @@
 from typing import Callable
 
+from app import settings
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema, unset
 
@@ -39,7 +40,7 @@ def swagger_authenticated_schema(
     )
     manual_parameters.append(
         openapi.Parameter(
-            "Mock-Session-User-Id",
+            settings.CUSTOM_HEADER_MOCK_SESSION_USER_ID,
             openapi.IN_HEADER,
             description="Mock Session User Id",
             type=openapi.TYPE_STRING,
