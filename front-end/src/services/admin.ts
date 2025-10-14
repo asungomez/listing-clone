@@ -1,20 +1,27 @@
 import { client } from "./api-client";
-import { schemas } from "./generated-zodios-client";
-import { z } from "zod";
+import { api } from "./generated-zodios-client";
+import type {
+  ApiOf,
+  ZodiosQueryParamsByAlias,
+  ZodiosResponseByAlias,
+} from "@zodios/core";
 
-export type ListUsersResponse = z.infer<
-  typeof schemas.ListUsersResponse
->["users"];
-export type ListUsersArgs = {
-  query?: string;
-  limit?: number;
-};
-export const listUsers = async ({
-  query,
-  limit,
-}: ListUsersArgs): Promise<ListUsersResponse> => {
+type UsersListApiResponse = ZodiosResponseByAlias<
+  ApiOf<typeof api>,
+  "users_list"
+>;
+export type ListUsersResponse = UsersListApiResponse["users"];
+
+export type ListUsersArgs = ZodiosQueryParamsByAlias<
+  ApiOf<typeof api>,
+  "users_list"
+>;
+
+export const listUsers = async (
+  args: ListUsersArgs
+): Promise<ListUsersResponse> => {
   const { users } = await client.users_list({
-    queries: { page_size: limit, email: query },
+    queries: args,
   });
   return users;
 };

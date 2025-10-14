@@ -1,10 +1,10 @@
+import { ApiOf, ZodiosResponseByAlias } from "@zodios/core";
 import { client } from "./api-client";
-import { schemas } from "./generated-zodios-client";
-import { z } from "zod";
+import { api } from "./generated-zodios-client";
 
-export type GetAuthenticatedUserResponse = z.infer<
-  typeof schemas.CurrentUserResponse
->["user"];
+type UsersMeApiResponse = ZodiosResponseByAlias<ApiOf<typeof api>, "users_me">;
+export type GetAuthenticatedUserResponse = UsersMeApiResponse["user"];
+
 export const getAuthenticatedUser =
   async (): Promise<GetAuthenticatedUserResponse> => {
     const { user } = await client.users_me();

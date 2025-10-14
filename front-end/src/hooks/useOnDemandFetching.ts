@@ -1,14 +1,13 @@
-/**
- * This hook is used to fetch data on demand, only triggering
- * the fetch when the user calls the returned function.
- *
- * It leverages SWR's cache and mutate functions to fetch the data,
- * and uses Zodio's types.
- */
 import { useCallback } from "react";
 import { useSWRConfig } from "swr";
 import { useAlert } from "../context/alert/AlertContext";
 
+/**
+ * This hook is used to fetch data on demand, only triggering
+ * the fetch when the user calls the returned function.
+ *
+ * It leverages SWR's cache and mutate functions to fetch the data.
+ */
 export const useOnDemandFetching = <ResponseType = unknown, ArgsType = unknown>(
   cacheCategory: string,
   fetcher: (args: ArgsType) => Promise<ResponseType>
