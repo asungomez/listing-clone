@@ -6,4 +6,5 @@ urlpatterns = [
   path("login-callback", views.LoginView.as_view(), name="login-callback"),
   path("logout", views.LogoutView.as_view(), name="logout"),
   path("me", views.CurrentUserView.as_view(), name="me"),
+  path("", views.ListUsersView.as_view(), name="list-users"),
 ]

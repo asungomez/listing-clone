@@ -1,9 +1,10 @@
-from typing import Any
+from typing import Any, Dict
 
 
-def user_factory(overrides: dict[str, Any]) -> dict[str, Any]:
-    user = {
+def user_factory(overrides: Dict[str, Any] = {}) -> Dict[str, Any]:
+    user: dict[str, Any] = {
         "email": "fake-user@email.net",
+        "username": "fake-user",
         "first_name": "Fake",
         "last_name": "User",
         "is_active": True,

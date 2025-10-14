@@ -1,9 +1,10 @@
 """
 Serializers for the User API view
 """
-from typing import Any
+from typing import Any, Dict, List, Tuple
 
 from core.models import User
+from core.serializers import PaginationSerializer
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
 from user.indexer import UserIndexer
@@ -32,6 +33,7 @@ class UserSerializer(serializers.ModelSerializer[User]):
             "username",
             "first_name",
             "last_name",
+            "is_superuser",
             )
         read_only_fields = ("id", "email", "username")
 
@@ -47,7 +49,73 @@ class UserSerializer(serializers.ModelSerializer[User]):
     def find_by_email(self, email: str) -> User:
         """Find a user by email"""
         lower_email = email.lower()
-        user = self.indexer.search_by_email(lower_email)
+        user = self.indexer.find_by_email(lower_email)
         if not user:
             raise User.DoesNotExist("User not found")
         return user
+
+    def find_by_id(self, id: int) -> User:
+        """Find a user by id"""
+        user = self.indexer.find_by_id(id)
+        if not user:
+            raise User.DoesNotExist("User not found")
+        return user
+
+    def all_users(
+        self,
+        offset: int,
+        page_size: int
+    ) -> Tuple[List[User], int]:
+        """Get paginated users and total count from the Solr index"""
+        users, total = self.indexer.all_users(offset, page_size)
+        return users, total
+
+    def search_by_email(
+        self,
+        email: str,
+        offset: int,
+        page_size: int
+    ) -> Tuple[List[User], int]:
+        """Search users by email with pagination and get total count"""
+        lower_email = email.lower()
+        users, total = self.indexer.search_by_email(
+            lower_email,
+            offset,
+            page_size
+            )
+        return users, total
+
+
+class CurrentUserResponseSerializer(serializers.Serializer[Dict[str, User]]):
+    """Response serializer for the current user endpoint."""
+
+    user = UserSerializer()
+
+
+class ListUsersResponseSerializer(serializers.Serializer[Dict[str, Any]]):
+    """Response serializer for the list users endpoint."""
+
+    users = UserSerializer(many=True)
+    total_count = serializers.IntegerField()
+    indexer = UserIndexer()
+
+    def search_by_email(
+        self,
+        email: str,
+        offset: int,
+        page_size: int
+    ) -> Tuple[List[User], int]:
+        """Search users by email with pagination and get total count"""
+        lower_email = email.lower()
+        users, total = self.indexer.search_by_email(
+            lower_email,
+            offset,
+            page_size
+            )
+        return users, total
+
+
+class ListUsersQuerySerializer(PaginationSerializer[str]):
+    """Query params serializer for the list users endpoint."""
+
+    email = serializers.CharField(required=False, allow_blank=True)

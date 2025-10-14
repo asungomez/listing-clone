@@ -1,6 +1,7 @@
 import json
 from typing import Callable, Optional, Tuple
 
+import app.settings as app_settings
 import requests
 from core.crypto import Crypto
 from core.models import User
@@ -9,7 +10,7 @@ from django.http import HttpRequest
 from django.http.response import HttpResponseBase
 from rest_framework import authentication
 from rest_framework.exceptions import AuthenticationFailed
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import BasePermission, IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.views import APIView
 from user.serializers import UserSerializer
@@ -27,6 +28,16 @@ class SessionInvalidException(Exception):
 
 class InactiveUserException(Exception):
     """Raised when the user is inactive"""
+    pass
+
+
+class MockSessionUserNotFoundException(Exception):
+    """Raised when the mock session user is not found"""
+    pass
+
+
+class UserNotAdminException(Exception):
+    """Raised when the user is not an admin"""
     pass
 
 
@@ -270,6 +281,32 @@ class OktaAuthentication(authentication.BaseAuthentication):
             # If access token changed (refreshed), mark it for response cookies
             if original_access_token != at and rt is not None:
                 setattr(base_request, "auth_tokens_to_set", (at, rt))
+
+            mock_session_user_id = base_request.headers.get(
+                app_settings.CUSTOM_HEADER_MOCK_SESSION_USER_ID
+                )
+            if mock_session_user_id:
+                if not user.is_superuser:
+                    raise UserNotAdminException(
+                        "User is not an admin"
+                    )
+                try:
+                    mock_session_user_id = int(mock_session_user_id)
+                except ValueError:
+                    raise MockSessionUserNotFoundException(
+                        "Mock session user id is not an integer"
+                    )
+                mock_session_user = UserSerializer().find_by_id(
+                    mock_session_user_id
+                    )
+                if not mock_session_user:
+                    raise MockSessionUserNotFoundException(
+                        "Mock session user not found"
+                    )
+                if not mock_session_user.is_active:
+                    raise InactiveUserException("User is inactive")
+
+                user = mock_session_user
             return user, None
         except SessionExpiredException as e:
             base_req = getattr(request, "_request", request)
@@ -316,6 +353,20 @@ class OktaAuthentication(authentication.BaseAuthentication):
                     "code": "session_invalid"
                 }
             )
+        except MockSessionUserNotFoundException as e:
+            raise AuthenticationFailed(
+                {
+                    "message": str(e),
+                    "code": "mock_session_user_not_found"
+                }
+            )
+        except UserNotAdminException as e:
+            raise AuthenticationFailed(
+                {
+                    "message": str(e),
+                    "code": "user_not_admin"
+                }
+            )
 
 
 class AuthenticationCookieMiddleware:
@@ -359,3 +410,16 @@ class AuthenticatedRequest(Request):
 class AuthenticatedAPIView(APIView):
     authentication_classes = [OktaAuthentication]
     permission_classes = [IsAuthenticated]
+
+
+class IsSuperUser(BasePermission):
+    """
+    Allows access only to admin users.
+    """
+
+    def has_permission(self, request: Request, view: APIView) -> bool:
+        return bool(request.user and request.user.is_superuser)
+
+
+class AdminAPIView(AuthenticatedAPIView):
+    permission_classes = [IsAuthenticated, IsSuperUser]

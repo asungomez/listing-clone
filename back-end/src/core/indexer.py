@@ -1,5 +1,5 @@
 from abc import ABC
-from typing import Any, Dict, Generic, List, Type, TypeVar
+from typing import Any, Dict, Generic, List, Optional, Tuple, Type, TypeVar
 
 import requests
 from app import settings
@@ -15,6 +15,7 @@ class Indexer:
     """
 
     url: str
+    override_types: Optional[Dict[str, str]]
 
     def __init__(self) -> None:
         self.url = f"{settings.SOLR_URL}/{settings.SOLR_CORE}"
@@ -27,8 +28,16 @@ class Indexer:
         :return: The built query.
         """
         transformed_query = self.transform_data(query)
+
+        def escape_value(value: Any) -> str:
+            if isinstance(value, str):
+                return value.replace(":", r"\:")
+            return str(value)
+
         return "&".join([
-            f"{key}:{value}" for key, value in transformed_query.items()
+            f"{key}:{
+                escape_value(value)
+                }" for key, value in transformed_query.items()
             ])
 
     def update(self, data: Dict[str, Any]) -> None:
@@ -45,7 +54,12 @@ class Indexer:
             )
         response.raise_for_status()
 
-    def select(self, query: str) -> Dict[str, Any]:
+    def select(
+        self,
+        query: str,
+        start: Optional[int] = None,
+        rows: Optional[int] = None,
+    ) -> Dict[str, Any]:
         """
         Search the Solr index for a given query.
 
@@ -53,7 +67,12 @@ class Indexer:
         :return: The response from the Solr index.
         """
         try:
-            response = requests.get(f"{self.url}/select?q={query}&wt=json")
+            url = f"{self.url}/select?q={query}&wt=json"
+            if rows is not None:
+                url = f"{url}&rows={rows}"
+            if start is not None:
+                url = f"{url}&start={start}"
+            response = requests.get(url)
             response.raise_for_status()
             response_body: Dict[str, Any] = response.json()
             return response_body
@@ -72,7 +91,7 @@ class Indexer:
         for key, value in data.items():
             if key == "id":
                 reverse_transformed_data[key] = value
-            elif key.endswith("_s"):
+            elif key.endswith("_s") or key.endswith("_t"):
                 reverse_transformed_data[key[:-2]] = value
             elif key.endswith("_i"):
                 reverse_transformed_data[key[:-2]] = int(value)
@@ -91,18 +110,20 @@ class Indexer:
         """
         transformed_data: Dict[str, Any] = {}
         for key, value in data.items():
-            if not value:
+            if value is None:
                 continue
             if key == "id":
                 transformed_data[key] = value
+            elif self.override_types and key in self.override_types:
+                transformed_data[f"{key}_{self.override_types[key]}"] = value
             elif isinstance(value, str):
                 transformed_data[f"{key}_s"] = value
+            elif isinstance(value, bool):
+                transformed_data[f"{key}_b"] = value
             elif isinstance(value, int):
                 transformed_data[f"{key}_i"] = value
             elif isinstance(value, float):
                 transformed_data[f"{key}_f"] = value
-            elif isinstance(value, bool):
-                transformed_data[f"{key}_b"] = value
             else:
                 transformed_data[f"{key}_s"] = str(value)
         return transformed_data
@@ -129,13 +150,36 @@ class ModelIndexer(Indexer, ABC, Generic[GenericModel]):
         data = serializer.data
         self.update(data)
 
-    def search(self, query: Dict[str, Any]) -> List[GenericModel]:
+    def all(self, offset: int, page_size: int) -> Tuple[
+        List[GenericModel],
+        int
+    ]:
         """
-        Search the Solr index for a given query.
+        Get all instances from the Solr index.
         """
+        return self.search({}, offset, page_size)
+
+    def search(
+        self,
+        query: Dict[str, Any],
+        offset: int,
+        page_size: int,
+    ) -> tuple[List[GenericModel], int]:
+        """
+        Search the Solr index for a given query with pagination.
+
+        :param query: The query to search for.
+        :param offset: The starting offset of the results.
+        :param page_size: The number of results to return.
+        :return: A tuple of (results, total_count).
+        """
+        if "id" not in query:
+            query["id"] = "*"
         query_str = self.build_query(query)
-        response = self.select(query_str)
-        docs = response.get("response", {}).get("docs", [])
+        response = self.select(query_str, start=offset, rows=page_size)
+        resp_obj = response.get("response", {})
+        docs = resp_obj.get("docs", [])
+        total_count: int = int(resp_obj.get("numFound", 0))
         model_cls: Type[GenericModel] = self.serializer_class.Meta.model
         results: List[GenericModel] = []
         for doc in docs:
@@ -144,7 +188,7 @@ class ModelIndexer(Indexer, ABC, Generic[GenericModel]):
             if serializer.is_valid():
                 instance = model_cls(**transformed_doc)
                 results.append(instance)
-        return results
+        return results, total_count
 
     def transform_data(self, data: Dict[str, Any]) -> Dict[str, Any]:
         transformed_data = super().transform_data(data)

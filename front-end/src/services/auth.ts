@@ -1,14 +1,16 @@
-import { isUser, User } from "../models/user";
-import { fetcher } from "./axios";
+import { ApiOf, ZodiosResponseByAlias } from "@zodios/core";
+import { client } from "./api-client";
+import { api } from "./generated-zodios-client";
 
-export const getAuthenticatedUser = async (): Promise<User> => {
-  const { data } = await fetcher.get("/users/me");
-  if (!isUser(data?.user)) {
-    throw new Error("Invalid user data");
-  }
-  return data.user;
-};
+type UsersMeApiResponse = ZodiosResponseByAlias<ApiOf<typeof api>, "users_me">;
+export type GetAuthenticatedUserResponse = UsersMeApiResponse["user"];
+
+export const getAuthenticatedUser =
+  async (): Promise<GetAuthenticatedUserResponse> => {
+    const { user } = await client.users_me();
+    return user;
+  };
 
 export const logOut = async (): Promise<void> => {
-  await fetcher.post("/users/logout");
+  await client.logout(undefined);
 };

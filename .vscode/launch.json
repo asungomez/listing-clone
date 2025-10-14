@@ -14,6 +14,18 @@
       "python": "${workspaceFolder}/back-end/venv/bin/python"
     },
     {
+      "name": "Reindex",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/back-end/src/manage.py",
+      "args": ["reindex"],
+      "django": true,
+      "justMyCode": false,
+      "cwd": "${workspaceFolder}/back-end",
+      "envFile": "${workspaceFolder}/back-end/src/.env",
+      "python": "${workspaceFolder}/back-end/venv/bin/python"
+    },
+    {
       "name": "Headless E2E tests",
       "type": "debugpy",
       "request": "launch",

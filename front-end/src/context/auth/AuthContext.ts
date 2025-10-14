@@ -1,5 +1,5 @@
 import { createContext, useContext } from "react";
-import { User } from "../../models/user";
+import { GetAuthenticatedUserResponse } from "../../services/auth";
 
 export type AuthStatus =
   | "authenticated" // The authentication process has completed successfully and the authenticated user is available.
@@ -9,8 +9,13 @@ export type AuthStatus =
 type AuthContextType = {
   logOut: () => Promise<void>;
   redirectToLogin: () => Promise<void>;
+  startMockingSession: (user: GetAuthenticatedUserResponse) => void;
+  stopMockingSession: () => void;
   status: AuthStatus;
-  user: User | null;
+  user: GetAuthenticatedUserResponse | null;
+  authenticatedUser: GetAuthenticatedUserResponse | null;
+  isAdmin: boolean;
+  mockSessionUser: GetAuthenticatedUserResponse | null;
 };
 
 export const AuthContext = createContext<AuthContextType>({
@@ -18,6 +23,11 @@ export const AuthContext = createContext<AuthContextType>({
   redirectToLogin: async () => {},
   status: "loading",
   user: null,
+  authenticatedUser: null,
+  isAdmin: false,
+  mockSessionUser: null,
+  startMockingSession: () => {},
+  stopMockingSession: () => {},
 });
 
 export const useAuth = () => useContext(AuthContext);

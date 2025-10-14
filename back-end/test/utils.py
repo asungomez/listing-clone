@@ -1,6 +1,8 @@
 import json
 import logging
-from typing import Any, Dict, Literal, Mapping, Optional, Sequence, Tuple
+from typing import (
+    Any, Callable, Dict, Literal, Mapping, Optional, Sequence, Tuple,
+)
 
 import psycopg2
 import requests
@@ -8,6 +10,16 @@ from cryptography.fernet import Fernet
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+CUSTOM_SOLR_TRANSFORMATIONS: Dict[
+    str,
+    Callable[[Dict[str, Any]], Dict[str, Any]]
+    ] = {
+        "user": lambda document: {
+            **document,
+            "email_ngram_ng": document.get("email_s")
+        }
+    }
 
 
 class Helper:
@@ -57,7 +69,7 @@ class Helper:
         email: str,
         method: Literal["header", "cookie"] = "cookie",
         omit_auth_mocking: bool = False,
-    ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    ) -> Tuple[Dict[str, str], Dict[str, str]]:
         """
         Authenticate a user in a request.
 
@@ -152,7 +164,9 @@ class Helper:
             path: str,
             authenticated_as: Optional[str] = None,
             authentication_method: Literal["header", "cookie"] = "cookie",
+            mock_session_user_id: Optional[int] = None,
             omit_auth_mocking: bool = False,
+            query_params: Optional[Dict[str, Any]] = None,
             ) -> requests.Response:
         """
         Make a request to the API.
@@ -163,28 +177,34 @@ class Helper:
         The options are:
         - "header": Authenticate with a header
         - "cookie": Authenticate with a cookie
+        :param mock_session_user_id: The id of the user to impersonate
         :param omit_auth_mocking: If True, the authentication mocking will be
         omitted
+        :param query_params: The query parameters to pass to the request
         :return: The response object
         """
         url = f"{self.api_url}{path}"
-        headers = {
+        headers: Dict[str, str] = {
             "Accept": "application/json",
         }
+        if mock_session_user_id:
+            headers["Mock-Session-User-Id"] = str(mock_session_user_id)
         cookies: Dict[str, Any] = {}
         if authenticated_as is not None:
-            headers, cookies = self.authenticate(
+            auth_headers, auth_cookies = self.authenticate(
                 authenticated_as,
                 authentication_method,
                 omit_auth_mocking
             )
-            headers.update(headers)
-            cookies.update(cookies)
+            headers.update(auth_headers)
+            cookies.update(auth_cookies)
+
         response = requests.get(
             url,
             allow_redirects=False,
             headers=headers,
-            cookies=cookies
+            cookies=cookies,
+            params=query_params
             )
         return response
 
@@ -515,5 +535,9 @@ class Helper:
                 transformed_document[f"{key}_i"] = value
             elif isinstance(value, float):
                 transformed_document[f"{key}_f"] = value
+        if document_type in CUSTOM_SOLR_TRANSFORMATIONS:
+            transformed_document = CUSTOM_SOLR_TRANSFORMATIONS[document_type](
+                transformed_document
+            )
 
         return transformed_document
