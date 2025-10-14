@@ -5,31 +5,31 @@ import {
   AutoSuggestion,
   SuggestionItem,
 } from "../../atoms/AutoSuggestion/AutoSuggestion";
+import { useSearchUsers } from "../../hooks/useSearchUsers";
+
+const SEARCH_RESULTS_LIMIT = 5;
 
 export const UserMenu: FC = () => {
-  const { logOut } = useAuth();
+  const { logOut, isAdmin } = useAuth();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [selectedUser, setSelectedUser] =
     useState<SuggestionItem<string> | null>(null);
+  const { searchUsers } = useSearchUsers(SEARCH_RESULTS_LIMIT);
 
-  const emailSuggestions = useMemo(() => {
-    const base = [
-      "jane.doe@example.com",
-      "john.smith@example.com",
-      "demo.user@example.com",
-      "admin@example.com",
-      "support@example.com",
-    ];
-    return async (search: string): Promise<SuggestionItem<string>[]> => {
-      const q = search.trim().toLowerCase();
-      await new Promise((r) => setTimeout(r, 500));
-      const matched = q
-        ? base.filter((e) => e.toLowerCase().includes(q))
-        : base;
-      const unique = Array.from(new Set(matched));
-      return unique.slice(0, 8).map((e) => ({ label: e, value: e }));
-    };
-  }, []);
+  const emailSuggestions = useCallback(
+    async (search: string): Promise<SuggestionItem<string>[]> => {
+      const list = await searchUsers(search);
+      const suggestions = list
+        .map((u) => u.email)
+        .filter((e): e is string => Boolean(e))
+        .map((e) => ({ label: e, value: e }));
+      const uniqueByLabel = Array.from(
+        new Map(suggestions.map((s) => [s.label.toLowerCase(), s])).values()
+      );
+      return uniqueByLabel;
+    },
+    [searchUsers]
+  );
 
   const handleLogOut = useCallback(async () => {
     if (isLoggingOut) return;
@@ -55,16 +55,18 @@ export const UserMenu: FC = () => {
   );
   return (
     <>
-      <div className="px-1 pb-2">
-        <AutoSuggestion<string>
-          label="Switch user"
-          placeholder="Type an email..."
-          autoComplete="off"
-          value={selectedUser}
-          onChange={setSelectedUser}
-          suggestionsGenerator={emailSuggestions}
-        />
-      </div>
+      {isAdmin && (
+        <div className="px-1 pb-2">
+          <AutoSuggestion<string>
+            label="Switch user"
+            placeholder="Type an email..."
+            autoComplete="off"
+            value={selectedUser}
+            onChange={setSelectedUser}
+            suggestionsGenerator={emailSuggestions}
+          />
+        </div>
+      )}
       <Menu items={menuItems} />
     </>
   );

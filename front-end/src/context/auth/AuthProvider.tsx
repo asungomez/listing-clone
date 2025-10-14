@@ -91,9 +91,11 @@ export const AuthProvider: FC<AuthProviderProps> = ({ children }) => {
     );
   }
 
+  const isAdmin = user?.is_superuser ?? false;
+
   return (
     <AuthContext.Provider
-      value={{ redirectToLogin, user, status: authStatus, logOut }}
+      value={{ redirectToLogin, user, status: authStatus, logOut, isAdmin }}
     >
       {children}
     </AuthContext.Provider>

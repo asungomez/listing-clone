@@ -11,6 +11,7 @@ type AuthContextType = {
   redirectToLogin: () => Promise<void>;
   status: AuthStatus;
   user: GetAuthenticatedUserResponse | null;
+  isAdmin: boolean;
 };
 
 export const AuthContext = createContext<AuthContextType>({
@@ -18,6 +19,7 @@ export const AuthContext = createContext<AuthContextType>({
   redirectToLogin: async () => {},
   status: "loading",
   user: null,
+  isAdmin: false,
 });
 
 export const useAuth = () => useContext(AuthContext);

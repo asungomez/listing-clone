@@ -12,5 +12,5 @@ export const getAuthenticatedUser =
   };
 
 export const logOut = async (): Promise<void> => {
-  await client.users_logout_create(undefined);
+  await client.logout(undefined);
 };
