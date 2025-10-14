@@ -1,5 +1,5 @@
-from .factories.user import user_factory
-from .utils import Helper
+from test.factories.user import user_factory
+from test.utils import Helper
 
 
 def test_without_auth_data(tests_helper: Helper) -> None:

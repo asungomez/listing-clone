@@ -1,5 +1,5 @@
-from .factories.user import user_factory
-from .utils import Helper
+from test.factories.user import user_factory
+from test.utils import Helper
 
 
 def test_access_token_valid_in_cookie(tests_helper: Helper) -> None:

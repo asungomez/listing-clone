@@ -1,7 +1,7 @@
-from src.app import settings
+from test.factories.user import user_factory
+from test.utils import Helper
 
-from .factories.user import user_factory
-from .utils import Helper
+from src.app import settings
 
 
 def test_list_users_not_authenticated(tests_helper: Helper) -> None:

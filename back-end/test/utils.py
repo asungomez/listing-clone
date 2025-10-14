@@ -164,6 +164,7 @@ class Helper:
             path: str,
             authenticated_as: Optional[str] = None,
             authentication_method: Literal["header", "cookie"] = "cookie",
+            mock_session_user_id: Optional[int] = None,
             omit_auth_mocking: bool = False,
             query_params: Optional[Dict[str, Any]] = None,
             ) -> requests.Response:
@@ -176,6 +177,7 @@ class Helper:
         The options are:
         - "header": Authenticate with a header
         - "cookie": Authenticate with a cookie
+        :param mock_session_user_id: The id of the user to impersonate
         :param omit_auth_mocking: If True, the authentication mocking will be
         omitted
         :param query_params: The query parameters to pass to the request
@@ -185,6 +187,8 @@ class Helper:
         headers = {
             "Accept": "application/json",
         }
+        if mock_session_user_id:
+            headers["Mock-Session-User-Id"] = str(mock_session_user_id)
         cookies: Dict[str, Any] = {}
         if authenticated_as is not None:
             headers, cookies = self.authenticate(

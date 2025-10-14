@@ -30,6 +30,16 @@ class InactiveUserException(Exception):
     pass
 
 
+class MockSessionUserNotFoundException(Exception):
+    """Raised when the mock session user is not found"""
+    pass
+
+
+class UserNotAdminException(Exception):
+    """Raised when the user is not an admin"""
+    pass
+
+
 class TokenManager:
     """
     Class to manage Okta authentication and token handling
@@ -270,6 +280,26 @@ class OktaAuthentication(authentication.BaseAuthentication):
             # If access token changed (refreshed), mark it for response cookies
             if original_access_token != at and rt is not None:
                 setattr(base_request, "auth_tokens_to_set", (at, rt))
+
+            mock_session_user_id = base_request.headers.get(
+                "Mock-Session-User-Id"
+                )
+            if mock_session_user_id:
+                if not user.is_superuser:
+                    raise UserNotAdminException(
+                        "User is not an admin"
+                    )
+                mock_session_user = UserSerializer().find_by_id(
+                    mock_session_user_id
+                    )
+                if not mock_session_user:
+                    raise MockSessionUserNotFoundException(
+                        "Mock session user not found"
+                    )
+                if not mock_session_user.is_active:
+                    raise InactiveUserException("User is inactive")
+
+                user = mock_session_user
             return user, None
         except SessionExpiredException as e:
             base_req = getattr(request, "_request", request)
@@ -314,6 +344,20 @@ class OktaAuthentication(authentication.BaseAuthentication):
                 {
                     "message": str(e),
                     "code": "session_invalid"
+                }
+            )
+        except MockSessionUserNotFoundException as e:
+            raise AuthenticationFailed(
+                {
+                    "message": str(e),
+                    "code": "mock_session_user_not_found"
+                }
+            )
+        except UserNotAdminException as e:
+            raise AuthenticationFailed(
+                {
+                    "message": str(e),
+                    "code": "user_not_admin"
                 }
             )
 

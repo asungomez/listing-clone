@@ -1,4 +1,4 @@
-from .utils import Helper
+from test.utils import Helper
 
 
 def test_404(tests_helper: Helper) -> None:

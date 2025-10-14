@@ -54,6 +54,13 @@ class UserSerializer(serializers.ModelSerializer[User]):
             raise User.DoesNotExist("User not found")
         return user
 
+    def find_by_id(self, id: int) -> User:
+        """Find a user by id"""
+        user = self.indexer.find_by_id(id)
+        if not user:
+            raise User.DoesNotExist("User not found")
+        return user
+
     def all_users(
         self,
         offset: int,

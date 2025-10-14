@@ -40,6 +40,18 @@ class UserIndexer(ModelIndexer[User]):
             return None
         return results[0]
 
+    def find_by_id(self, id: int) -> Optional[User]:
+        """
+        Search the Solr index for a user by id.
+
+        :param id: The id to search for.
+        :return: The user if found, None otherwise.
+        """
+        results, _ = self.search({"id": id}, page_size=1, offset=0)
+        if len(results) == 0:
+            return None
+        return results[0]
+
     def reverse_transform_data(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Reverse transform the data from the Solr index.

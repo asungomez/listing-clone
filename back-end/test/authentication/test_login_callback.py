@@ -1,6 +1,6 @@
-from . import static
-from .factories.user import user_factory
-from .utils import Helper
+from test import static
+from test.factories.user import user_factory
+from test.utils import Helper
 
 
 def test_missing_code(tests_helper: Helper) -> None:
