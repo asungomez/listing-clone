@@ -69,7 +69,7 @@ class Helper:
         email: str,
         method: Literal["header", "cookie"] = "cookie",
         omit_auth_mocking: bool = False,
-    ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    ) -> Tuple[Dict[str, str], Dict[str, str]]:
         """
         Authenticate a user in a request.
 
@@ -184,20 +184,21 @@ class Helper:
         :return: The response object
         """
         url = f"{self.api_url}{path}"
-        headers = {
+        headers: Dict[str, str] = {
             "Accept": "application/json",
         }
         if mock_session_user_id:
             headers["Mock-Session-User-Id"] = str(mock_session_user_id)
         cookies: Dict[str, Any] = {}
         if authenticated_as is not None:
-            headers, cookies = self.authenticate(
+            auth_headers, auth_cookies = self.authenticate(
                 authenticated_as,
                 authentication_method,
                 omit_auth_mocking
             )
-            headers.update(headers)
-            cookies.update(cookies)
+            headers.update(auth_headers)
+            cookies.update(auth_cookies)
+
         response = requests.get(
             url,
             allow_redirects=False,

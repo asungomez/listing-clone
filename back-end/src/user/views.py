@@ -1,6 +1,7 @@
 from core.auth import (
     AdminAPIView, AuthenticatedAPIView, AuthenticatedRequest, TokenManager,
 )
+from core.swagger import swagger_authenticated_schema
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from drf_yasg import openapi
@@ -20,7 +21,7 @@ User = get_user_model()
 
 class CurrentUserView(AuthenticatedAPIView):
 
-    @swagger_auto_schema(
+    @swagger_authenticated_schema(
         responses={
             200: openapi.Response(
                 description="Current user",
@@ -36,7 +37,7 @@ class CurrentUserView(AuthenticatedAPIView):
 
 class ListUsersView(AdminAPIView):
 
-    @swagger_auto_schema(
+    @swagger_authenticated_schema(
         responses={
             200: openapi.Response(
                 description="List users",
@@ -152,7 +153,7 @@ class LoginView(APIView):
 
 class LogoutView(APIView):
 
-    @swagger_auto_schema(
+    @swagger_authenticated_schema(
         responses={200: openapi.Response(
             description="Logout the user",
             type=openapi.TYPE_STRING,
