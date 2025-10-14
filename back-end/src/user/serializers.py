@@ -1,7 +1,7 @@
 """
 Serializers for the User API view
 """
-from typing import Any, List, Tuple
+from typing import Any, Dict, List, Tuple
 
 from core.models import User
 from core.serializers import PaginationSerializer
@@ -86,17 +86,18 @@ class UserSerializer(serializers.ModelSerializer[User]):
         return users, total
 
 
-class CurrentUserResponseSerializer(serializers.Serializer):
+class CurrentUserResponseSerializer(serializers.Serializer[Dict[str, User]]):
     """Response serializer for the current user endpoint."""
 
     user = UserSerializer()
 
 
-class ListUsersResponseSerializer(serializers.Serializer):
+class ListUsersResponseSerializer(serializers.Serializer[Dict[str, Any]]):
     """Response serializer for the list users endpoint."""
 
     users = UserSerializer(many=True)
     total_count = serializers.IntegerField()
+    indexer = UserIndexer()
 
     def search_by_email(
         self,
@@ -114,7 +115,7 @@ class ListUsersResponseSerializer(serializers.Serializer):
         return users, total
 
 
-class ListUsersQuerySerializer(PaginationSerializer):
+class ListUsersQuerySerializer(PaginationSerializer[str]):
     """Query params serializer for the list users endpoint."""
 
     email = serializers.CharField(required=False, allow_blank=True)

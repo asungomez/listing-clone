@@ -1,5 +1,5 @@
 from abc import ABC
-from typing import Any, Dict, Generic, List, Optional, Type, TypeVar
+from typing import Any, Dict, Generic, List, Optional, Tuple, Type, TypeVar
 
 import requests
 from app import settings
@@ -150,7 +150,10 @@ class ModelIndexer(Indexer, ABC, Generic[GenericModel]):
         data = serializer.data
         self.update(data)
 
-    def all(self, offset: int, page_size: int) -> List[GenericModel]:
+    def all(self, offset: int, page_size: int) -> Tuple[
+        List[GenericModel],
+        int
+    ]:
         """
         Get all instances from the Solr index.
         """

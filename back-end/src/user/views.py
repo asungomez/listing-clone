@@ -1,11 +1,10 @@
 from core.auth import (
     AdminAPIView, AuthenticatedAPIView, AuthenticatedRequest, TokenManager,
 )
-from core.swagger import swagger_authenticated_schema
+from core.swagger import swagger_authenticated_schema, swagger_typed_schema
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from drf_yasg import openapi
-from drf_yasg.utils import swagger_auto_schema
 from rest_framework import status
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -82,7 +81,7 @@ class LoginView(APIView):
 
     serializer = UserSerializer()
 
-    @swagger_auto_schema(
+    @swagger_typed_schema(
         responses={302: openapi.Response(
             description="Redirect to the login page",
             type=openapi.TYPE_STRING,
@@ -179,7 +178,7 @@ class LogoutView(APIView):
 
 class RedirectToLoginView(APIView):
 
-    @swagger_auto_schema(
+    @swagger_typed_schema(
         responses={302: openapi.Response(
             description="Redirect to the login page",
             type=openapi.TYPE_STRING,

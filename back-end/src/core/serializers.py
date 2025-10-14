@@ -1,8 +1,12 @@
+from typing import Generic, TypeVar
+
 from app import settings
 from rest_framework import serializers
 
+T = TypeVar("T")
 
-class PaginationSerializer(serializers.Serializer):
+
+class PaginationSerializer(serializers.Serializer[T], Generic[T]):
     """Serializer for pagination"""
 
     offset = serializers.IntegerField(min_value=0, default=0, error_messages={

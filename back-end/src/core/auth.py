@@ -290,6 +290,12 @@ class OktaAuthentication(authentication.BaseAuthentication):
                     raise UserNotAdminException(
                         "User is not an admin"
                     )
+                try:
+                    mock_session_user_id = int(mock_session_user_id)
+                except ValueError:
+                    raise MockSessionUserNotFoundException(
+                        "Mock session user id is not an integer"
+                    )
                 mock_session_user = UserSerializer().find_by_id(
                     mock_session_user_id
                     )
@@ -411,7 +417,7 @@ class IsSuperUser(BasePermission):
     Allows access only to admin users.
     """
 
-    def has_permission(self, request, view):
+    def has_permission(self, request: Request, view: APIView) -> bool:
         return bool(request.user and request.user.is_superuser)
 
 

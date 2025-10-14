@@ -1,8 +1,6 @@
 from test.factories.user import user_factory
 from test.utils import Helper
 
-from src.app import settings
-
 
 def test_list_users_not_authenticated(tests_helper: Helper) -> None:
     """
@@ -137,7 +135,7 @@ def test_default_page_size(tests_helper: Helper) -> None:
     response_body = response.json()
     users_response = response_body.get("users")
     assert users_response is not None
-    assert len(users_response) == settings.DEFAULT_PAGE_SIZE
+    assert len(users_response) == 25
     total_count = response_body.get("total_count")
     assert total_count is not None
     assert total_count == users_count
@@ -264,7 +262,7 @@ def test_max_page_size(tests_helper: Helper) -> None:
     response = tests_helper.get_request(
         "/users/",
         authenticated_as=email,
-        query_params={"page_size": settings.MAX_PAGE_SIZE + 1},
+        query_params={"page_size": 101},
     )
     assert response.status_code == 400
     response_body = response.json()
