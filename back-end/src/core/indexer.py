@@ -34,7 +34,7 @@ class Indexer:
                 return value.replace(":", r"\:")
             return str(value)
 
-        return "&".join([
+        return " AND ".join([
             f"{key}:{
                 escape_value(value)
                 }" for key, value in transformed_query.items()
@@ -59,6 +59,8 @@ class Indexer:
         query: str,
         start: Optional[int] = None,
         rows: Optional[int] = None,
+        fl: Optional[str] = None,
+        fq: Optional[Any] = None,
     ) -> Dict[str, Any]:
         """
         Search the Solr index for a given query.
@@ -67,12 +69,22 @@ class Indexer:
         :return: The response from the Solr index.
         """
         try:
-            url = f"{self.url}/select?q={query}&wt=json"
+            params = {
+                "q": query,
+                "wt": "json"
+            }
             if rows is not None:
-                url = f"{url}&rows={rows}"
+                params["rows"] = rows
             if start is not None:
-                url = f"{url}&start={start}"
-            response = requests.get(url)
+                params["start"] = start
+            if fl is not None:
+                params["fl"] = fl
+            if fq is not None:
+                params["fq"] = fq
+            response = requests.get(
+                f"{self.url}/select",
+                params=params
+            )
             response.raise_for_status()
             response_body: Dict[str, Any] = response.json()
             return response_body
@@ -91,6 +103,18 @@ class Indexer:
         for key, value in data.items():
             if key == "id":
                 reverse_transformed_data[key] = value
+            if self.override_types and key in self.override_types:
+                overriden_type = self.override_types[key]
+                if overriden_type == "children":
+                    if isinstance(value, list):
+                        reverse_transformed_data[key] = [
+                            self.reverse_transform_data(child)
+                            for child in value
+                        ]
+                    else:
+                        reverse_transformed_data[key] = [
+                            self.reverse_transform_data(value)
+                        ]
             elif key.endswith("_s") or key.endswith("_t"):
                 reverse_transformed_data[key[:-2]] = value
             elif key.endswith("_i"):
@@ -114,13 +138,17 @@ class Indexer:
                 continue
             if key == "id":
                 transformed_data[key] = value
-            elif key == "_childDocuments_":
-                transformed_data[key] = [
-                    self.transform_data(child)
-                    for child in value
-                ]
             elif self.override_types and key in self.override_types:
-                transformed_data[f"{key}_{self.override_types[key]}"] = value
+                overriden_type = self.override_types[key]
+                if overriden_type == "children":
+                    transformed_data[key] = [
+                        self.transform_data(child)
+                        for child in value
+                    ]
+                else:
+                    transformed_data[
+                        f"{key}_{self.override_types[key]}"
+                    ] = value
             elif isinstance(value, str):
                 transformed_data[f"{key}_s"] = value
             elif isinstance(value, bool):
@@ -156,7 +184,7 @@ class ModelIndexer(Indexer, ABC, Generic[GenericModel]):
         self.update(data)
 
     def all(self, offset: int, page_size: int) -> Tuple[
-        List[GenericModel],
+        List[Dict[str, Any]],
         int
     ]:
         """
@@ -169,7 +197,10 @@ class ModelIndexer(Indexer, ABC, Generic[GenericModel]):
         query: Dict[str, Any],
         offset: int,
         page_size: int,
-    ) -> tuple[List[GenericModel], int]:
+        query_prefix: str = "",
+        fl: Optional[str] = None,
+        fq: Optional[Any] = None,
+    ) -> tuple[List[Dict[str, Any]], int]:
         """
         Search the Solr index for a given query with pagination.
 
@@ -179,20 +210,35 @@ class ModelIndexer(Indexer, ABC, Generic[GenericModel]):
         :return: A tuple of (results, total_count).
         """
         if "id" not in query:
-            query["id"] = "*"
+            if not fq:
+                fq = {
+                    "id": "*"
+                }
+            else:
+                fq["id"] = "*"
+        if fq:
+            fq_str = self.build_query(fq)
+        else:
+            fq_str = None
         query_str = self.build_query(query)
-        response = self.select(query_str, start=offset, rows=page_size)
+        if query_prefix:
+            query_str = f"{query_prefix}{query_str}"
+        response = self.select(
+            query=query_str,
+            start=offset,
+            rows=page_size,
+            fl=fl,
+            fq=fq_str,
+        )
         resp_obj = response.get("response", {})
         docs = resp_obj.get("docs", [])
         total_count: int = int(resp_obj.get("numFound", 0))
-        model_cls: Type[GenericModel] = self.serializer_class.Meta.model
-        results: List[GenericModel] = []
+        results: List[Dict[str, Any]] = []
         for doc in docs:
             transformed_doc = self.reverse_transform_data(doc)
             serializer = self.serializer_class(data=transformed_doc)
             if serializer.is_valid():
-                instance = model_cls(**transformed_doc)
-                results.append(instance)
+                results.append(transformed_doc)
         return results, total_count
 
     def transform_data(self, data: Dict[str, Any]) -> Dict[str, Any]:
@@ -207,5 +253,5 @@ class ModelIndexer(Indexer, ABC, Generic[GenericModel]):
         reverse_transformed_data = super().reverse_transform_data(data)
         if "id" in reverse_transformed_data:
             id_value = reverse_transformed_data["id"]
-            reverse_transformed_data["id"] = int(id_value.split(":")[1])
+            reverse_transformed_data["id"] = int(id_value.split(":")[-1])
         return reverse_transformed_data

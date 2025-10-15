@@ -86,22 +86,37 @@ class ListingSerializer(serializers.ModelSerializer[Listing]):
         except Exception as e:
             raise e
 
-    def search_by_coordinator_id(
-        self,
-        coordinator_id: int,
-        offset: int,
-        page_size: int,
-    ) -> Tuple[List[Listing], int]:
-        """Search for listings by coordinator id"""
-        return self.indexer.search_by_coordinator_id(
-            coordinator_id,
-            offset,
-            page_size
-        )
-
 
 class CreateListingSerializer(serializers.Serializer[Dict[str, Any]]):
     """Serializer for the create listing endpoint"""
 
     title = serializers.CharField(required=True)
     description = serializers.CharField(required=True)
+
+
+class ListingsListResponseSerializer(serializers.Serializer[Dict[str, Any]]):
+    """Serializer for the listings list endpoint"""
+
+    listings = ListingSerializer(many=True)
+    total_count = serializers.IntegerField()
+    indexer = ListingIndexer()
+
+    def search_by_coordinator_id(
+        self,
+        coordinator_id: int,
+        offset: int,
+        page_size: int,
+    ) -> Tuple[List[Listing], int]:
+        """
+        Search for listings by coordinator id
+
+        :param coordinator_id: The coordinator id
+        :param offset: The offset
+        :param page_size: The page size
+        :return: The listings and total count
+        """
+        return self.indexer.search_by_coordinator_id(
+            coordinator_id,
+            offset,
+            page_size
+        )

@@ -1,8 +1,12 @@
 from typing import Any
 
-from core.auth import AuthenticatedRequest, AuthenticatedViewSet
+from core.auth import (
+    AuthenticatedAPIView, AuthenticatedRequest, AuthenticatedViewSet,
+)
 from core.swagger import swagger_authenticated_schema
-from listing.serializers import CreateListingSerializer, ListingSerializer
+from listing.serializers import (
+    CreateListingSerializer, ListingSerializer, ListingsListResponseSerializer,
+)
 from rest_framework.mixins import CreateModelMixin
 from rest_framework.response import Response
 
@@ -65,3 +69,24 @@ class ListingViewSet(AuthenticatedViewSet, CreateModelMixin):
         """
         kwargs.setdefault("context", self.get_serializer_context())
         return ListingSerializer(*args, **kwargs)
+
+
+class MyListingsView(AuthenticatedAPIView):
+    """View for the my listings endpoint"""
+
+    serializer = ListingsListResponseSerializer()
+
+    @swagger_authenticated_schema(
+        responses={200: ListingsListResponseSerializer()},
+        operation_id="my_listings"
+    )
+    def get(self, request: AuthenticatedRequest) -> Response:
+        listings, total_count = self.serializer.search_by_coordinator_id(
+            request.user.id,
+            0,
+            10
+        )
+        return Response({
+            "listings": listings,
+            "total_count": total_count,
+        })

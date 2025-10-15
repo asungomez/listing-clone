@@ -38,7 +38,7 @@ class UserIndexer(ModelIndexer[User]):
         results, _ = self.search({"email": email}, page_size=1, offset=0)
         if len(results) == 0:
             return None
-        return results[0]
+        return User(**results[0])
 
     def find_by_id(self, id: int) -> Optional[User]:
         """
@@ -50,7 +50,7 @@ class UserIndexer(ModelIndexer[User]):
         results, _ = self.search({"id": id}, page_size=1, offset=0)
         if len(results) == 0:
             return None
-        return results[0]
+        return User(**results[0])
 
     def reverse_transform_data(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -79,11 +79,15 @@ class UserIndexer(ModelIndexer[User]):
         :param page_size: The number of results per page.
         :return: A tuple (results, total_count).
         """
-        return self.search(
+        results = self.search(
             {"email_ngram": email},
             offset,
             page_size
             )
+        return [
+            User(**result)
+            for result in results
+        ]
 
     def all_users(
         self,
