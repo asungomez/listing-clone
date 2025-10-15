@@ -92,3 +92,16 @@ class Listing(UpdatedBy):
 
     """The description of the listing"""
     description = models.TextField()
+
+
+class ListingCoordinator(models.Model):
+    """Listing coordinator in the system"""
+
+    """The listing that the coordinator is for"""
+    listing = models.ForeignKey(Listing, on_delete=models.CASCADE)
+
+    """The user that is the coordinator"""
+    coordinator = models.ForeignKey(User, on_delete=models.DO_NOTHING)
+
+    class Meta:
+        unique_together = ("listing", "coordinator")

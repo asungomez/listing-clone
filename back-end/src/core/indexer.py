@@ -114,6 +114,11 @@ class Indexer:
                 continue
             if key == "id":
                 transformed_data[key] = value
+            elif key == "_childDocuments_":
+                transformed_data[key] = [
+                    self.transform_data(child)
+                    for child in value
+                ]
             elif self.override_types and key in self.override_types:
                 transformed_data[f"{key}_{self.override_types[key]}"] = value
             elif isinstance(value, str):
