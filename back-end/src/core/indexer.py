@@ -70,7 +70,7 @@ class Indexer:
         :return: The response from the Solr index.
         """
         try:
-            params = {
+            params: Dict[str, Any] = {
                 "q": query,
                 "wt": "json"
             }

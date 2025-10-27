@@ -11,7 +11,7 @@ class ListingIndexer(ModelIndexer[Listing]):
         "coordinators": "children"
     }
 
-    def __init__(self):
+    def __init__(self) -> None:
         from listing.serializers import ListingSerializer
         super().__init__(ListingSerializer)
 
@@ -49,7 +49,10 @@ class ListingIndexer(ModelIndexer[Listing]):
             )
         )
 
-    def reverse_transform_data(self, data: dict) -> dict:
+    def reverse_transform_data(
+        self,
+        data: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Map Solr listing + children to serializer shape.
 
         - Remove doc_type from parent/children
@@ -69,7 +72,7 @@ class ListingIndexer(ModelIndexer[Listing]):
             else:
                 children_iter = coordinators
 
-            normalized: list[dict] = []
+            normalized: list[Dict[str, Any]] = []
             for child in children_iter:
                 if not isinstance(child, dict):
                     continue

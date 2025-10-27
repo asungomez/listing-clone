@@ -91,7 +91,7 @@ class UserIndexer(ModelIndexer[User]):
         self,
         offset: int,
         page_size: int,
-    ) -> tuple[List[User], int]:
+    ) -> tuple[List[Dict[str, Any]], int]:
         """
         Get all users with pagination.
 

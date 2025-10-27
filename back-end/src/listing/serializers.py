@@ -15,7 +15,7 @@ class CoordinatorSerializer(serializers.Serializer[Dict[str, Any]]):
 class ListingSerializer(serializers.ModelSerializer[Listing]):
     """Serializer for the listing object"""
 
-    indexer = ListingIndexer
+    indexer: ListingIndexer
 
     coordinators = serializers.ListField(
         child=CoordinatorSerializer()
@@ -54,23 +54,29 @@ class ListingSerializer(serializers.ModelSerializer[Listing]):
         :return: The representation of the listing object
         """
         if isinstance(instance, Listing):
-            coordinators = ListingCoordinator.objects.filter(listing=instance)
-            coordinators = [
+            coordinator_instances = ListingCoordinator.objects.filter(
+                listing=instance
+            )
+            coordinators: list[Dict[str, Any]] = [
                 {
                     "id": coordinator.coordinator.id,
                     "email": coordinator.coordinator.email
                 }
-                for coordinator in coordinators
+                for coordinator in coordinator_instances
             ]
             setattr(instance, "coordinators", coordinators)
-        return super().to_representation(instance)
+            return super().to_representation(instance)
+        return instance
 
     def save(
-        self,
-    ) -> None:
+        self, **kwargs: Any
+    ) -> Listing:
         """Create and new listing"""
         try:
-            current_user = self.context.get("request").user
+            current_request = self.context.get("request")
+            if current_request is None:
+                raise ValueError("Request is required")
+            current_user = current_request.user
             coordinators = self.validated_data.pop("coordinators")
             listing = Listing.objects.create(
                 **self.validated_data,
@@ -83,6 +89,7 @@ class ListingSerializer(serializers.ModelSerializer[Listing]):
                 )
             self.indexer.add(listing)
             self._data = self.to_representation(listing)
+            return listing
         except Exception as e:
             raise e
 
@@ -115,8 +122,10 @@ class ListingsListResponseSerializer(serializers.Serializer[Dict[str, Any]]):
         :param page_size: The page size
         :return: The listings and total count
         """
-        return self.indexer.search_by_coordinator_id(
+        listing_dicts, total_count = self.indexer.search_by_coordinator_id(
             coordinator_id,
             offset,
             page_size
         )
+        listings = [Listing(**listing_dict) for listing_dict in listing_dicts]
+        return listings, total_count
