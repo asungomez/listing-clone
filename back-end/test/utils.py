@@ -554,7 +554,7 @@ class Helper:
             f"{key}:{escape_value(value)}"
             for key, value in transformed_query.items()
         ]
-        query_string = "&".join(query_parts)
+        query_string = " AND ".join(query_parts)
         params: Dict[str, Any] = {
             "q": query_string,
             "wt": "json",
