@@ -79,15 +79,13 @@ class UserIndexer(ModelIndexer[User]):
         :param page_size: The number of results per page.
         :return: A tuple (results, total_count).
         """
-        results = self.search(
+        raw_results, total = self.search(
             {"email_ngram": email},
             offset,
             page_size
             )
-        return [
-            User(**result)
-            for result in results
-        ]
+        users = [User(**result) for result in raw_results]
+        return users, total
 
     def all_users(
         self,

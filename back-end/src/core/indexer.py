@@ -34,11 +34,12 @@ class Indexer:
                 return value.replace(":", r"\:")
             return str(value)
 
-        return " AND ".join([
-            f"{key}:{
-                escape_value(value)
-                }" for key, value in transformed_query.items()
-            ])
+        query_parts = [
+            f"{key}:{escape_value(value)}"
+            for key, value in transformed_query.items()
+        ]
+        # If there are no query parts, default to match all
+        return " AND ".join(query_parts) if query_parts else "*:*"
 
     def update(self, data: Dict[str, Any]) -> None:
         """
