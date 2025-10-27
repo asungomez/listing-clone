@@ -41,12 +41,9 @@ def test_create_listing(tests_helper: Helper) -> None:
     listing_id = int(response_body["id"])
     found_listing = tests_helper.find_listing_by_id(listing_id)
     assert found_listing is not None
-    print("found listing", found_listing)
     assert found_listing["title"] == listing["title"]
     assert found_listing["description"] == listing["description"]
-    assert found_listing["coordinators"] == [
-        {
-            "id": user["id"],
-            "email": user["email"]
-        }
-    ]
+    coordinators = found_listing["coordinators"]
+    assert len(coordinators) == 1
+    assert coordinators[0]["coordinator_id"] == user["id"]
+    assert coordinators[0]["coordinator_email"] == user["email"]

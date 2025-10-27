@@ -21,6 +21,20 @@ CUSTOM_SOLR_TRANSFORMATIONS: Dict[
         }
     }
 
+CUSTOM_SOLR_REVERSE_TRANSFORMATIONS: Dict[
+    str,
+    Callable[[Dict[str, Any]], Dict[str, Any]]
+    ] = {
+        "listing": lambda document: {
+            **document,
+            "coordinators": (
+                [document.get("coordinators")]
+                if isinstance(document.get("coordinators"), dict)
+                else document.get("coordinators")
+            )
+        }
+    }
+
 
 class Helper:
     """
@@ -472,7 +486,8 @@ class Helper:
 
     def reverse_transform_solr_document(
         self,
-        document: dict[str, Any]
+        document: dict[str, Any],
+        document_type: str
     ) -> dict[str, Any]:
         """
         Reverse transform a document to get it ready for the database.
@@ -485,11 +500,22 @@ class Helper:
         for key, value in document.items():
             if key == "id":
                 try:
-                    id_value = value.split(":")[1]
+                    id_value = value.split(":")[-1]
                     numeric_value = int(id_value)
                     transformed_document[key] = numeric_value
                 except Exception as e:
                     raise e
+            elif isinstance(value, list):
+                transformed_document[key] = [
+                    self.reverse_transform_solr_document(item, "child")
+                    if isinstance(item, dict)
+                    else item
+                    for item in value
+                ]
+            elif isinstance(value, dict):
+                transformed_document[key] = (
+                    self.reverse_transform_solr_document(value, "child")
+                )
             elif key.endswith("_s"):
                 transformed_document[key[:-2]] = value
             elif key.endswith("_i"):
@@ -498,6 +524,11 @@ class Helper:
                 transformed_document[key[:-2]] = float(value)
             elif key.endswith("_b"):
                 transformed_document[key[:-2]] = bool(value)
+        if document_type in CUSTOM_SOLR_REVERSE_TRANSFORMATIONS:
+            transformer_function = CUSTOM_SOLR_REVERSE_TRANSFORMATIONS[
+                document_type
+            ]
+            transformed_document = transformer_function(transformed_document)
         return transformed_document
 
     def search_solr(
@@ -538,7 +569,7 @@ class Helper:
         response_body = response.json()
         docs = response_body.get("response", {}).get("docs", [])
         return [
-            self.reverse_transform_solr_document(doc)
+            self.reverse_transform_solr_document(doc, document_type)
             for doc in docs
         ]
 
