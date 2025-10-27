@@ -142,6 +142,22 @@ class Helper:
         encrypted = cipher.encrypt(value.encode())
         return encrypted.decode()
 
+    def find_listing_by_id(self, listing_id: int) -> Optional[dict[str, Any]]:
+        """
+        Find a listing by id.
+
+        :param id: The id of the listing to find
+        :return: The listing object if found, None otherwise
+        """
+        result = self.search_solr(
+            document_type="listing",
+            query={"id": listing_id},
+        )
+        if result is None or len(result) == 0:
+            return None
+        first_result = result[0]
+        return first_result
+
     def find_user_by_email(self, email: str) -> Optional[dict[str, Any]]:
         """
         Find a user by email.
@@ -497,11 +513,26 @@ class Helper:
         :return: The result of the search
         """
         transformed_query = self.transform_solr_document(document_type, query)
-        query_string = "&".join([
-            f"{key}:{value}" for key, value in transformed_query.items()
-            ])
+
+        def escape_value(value: Any) -> str:
+            if isinstance(value, str):
+                return value.replace(":", r"\:")
+            return str(value)
+
+        query_parts = [
+            f"{key}:{escape_value(value)}"
+            for key, value in transformed_query.items()
+        ]
+        query_string = "&".join(query_parts)
+        params: Dict[str, Any] = {
+            "q": query_string,
+            "wt": "json",
+            "fl": "*,[child childFilter=*:*]"
+        }
+
         response = requests.get(
-            f"{self.solr_url}/select?q={query_string}&wt=json"
+            f"{self.solr_url}/select",
+            params=params
             )
         response.raise_for_status()
         response_body = response.json()
