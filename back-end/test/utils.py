@@ -15,11 +15,15 @@ CUSTOM_SOLR_TRANSFORMATIONS: Dict[
     str,
     Callable[[Dict[str, Any]], Dict[str, Any]]
     ] = {
-        "user": lambda document: {
-            **document,
-            "email_ngram_ng": document.get("email_s")
-        }
-    }
+    "user": lambda document: {
+        **document,
+        "email_ngram_ng": document.get("email_s")
+    },
+    "listing": lambda document: {
+        **document,
+        "doc_type_s": "listing",
+    },
+}
 
 CUSTOM_SOLR_REVERSE_TRANSFORMATIONS: Dict[
     str,
@@ -122,7 +126,9 @@ class Helper:
         This is used to remove all data from the db.
         """
         tables_to_clean = [
-            "core_user"
+            "core_user",
+            "core_listing",
+            "core_listingcoordinator",
         ]
         for table in tables_to_clean:
             query = f"DELETE FROM {table}"
@@ -259,6 +265,70 @@ class Helper:
             headers={"Content-Type": "application/json"}
             )
         response.raise_for_status()
+
+    def insert_listing(self, listing: dict[str, Any]) -> None:
+        """
+        Insert a listing into the database.
+
+        :param listing: The listing object to insert
+        """
+        if self.db_connection is None:
+            raise Exception("Database connection is not established")
+        cursor = self.db_connection.cursor()
+        query = """
+            INSERT INTO core_listing (
+                title,
+                description,
+                updated_by_id,
+                updated_at
+            )
+            VALUES (
+                %(title)s,
+                %(description)s,
+                %(updated_by)s,
+                NOW()
+            )
+            RETURNING id
+        """
+        cursor.execute(query, listing)
+        returned_element = cursor.fetchone()
+        if returned_element is None:
+            raise Exception("Error inserting listing into the database")
+        listing["id"] = returned_element[0]
+        coordinators = listing.get("coordinators")
+        if isinstance(coordinators, list):
+            for i, coordinator in enumerate[Dict[str, Any]](coordinators):
+                coord_query = """
+                    INSERT INTO core_listingcoordinator (
+                        listing_id,
+                        coordinator_id
+                    )
+                    VALUES (
+                        %(listing_id)s,
+                        %(coordinator_id)s
+                    )
+                    RETURNING id
+                """
+                cursor.execute(coord_query, {
+                    "listing_id": listing["id"],
+                    "coordinator_id": coordinator["coordinator_id"],
+                })
+                returned_element = cursor.fetchone()
+                if returned_element is None:
+                    raise Exception(
+                        "Error inserting listing coordinator into the database"
+                    )
+                listing["coordinators"][i]["id"] = (
+                    f"coordinator:{returned_element[0]}"
+                    f":{listing['id']}"
+                )
+                listing["coordinators"][i]["doc_type"] = "coordinator"
+        self.db_connection.commit()
+        cursor.close()
+        self.index_solr_document(
+            document_type="listing",
+            document=listing
+        )
 
     def insert_user(self, user: dict[str, Any]) -> None:
         """
@@ -589,6 +659,18 @@ class Helper:
         for key, value in document.items():
             if key == "id":
                 transformed_document[key] = f"{document_type}:{value}"
+            elif isinstance(value, list):
+                transformed_document[key] = [
+                    self.transform_solr_document("child", item)
+                    if isinstance(item, dict)
+                    else item
+                    for item in value
+                ]
+            elif isinstance(value, dict):
+                transformed_document[key] = self.transform_solr_document(
+                    "child",
+                    value
+                )
             elif isinstance(value, str):
                 transformed_document[f"{key}_s"] = value
             elif isinstance(value, bool):

@@ -113,7 +113,7 @@ class ListingsListResponseSerializer(serializers.Serializer[Dict[str, Any]]):
         coordinator_id: int,
         offset: int,
         page_size: int,
-    ) -> Tuple[List[Listing], int]:
+    ) -> Tuple[List[Dict[str, Any]], int]:
         """
         Search for listings by coordinator id
 
@@ -127,5 +127,4 @@ class ListingsListResponseSerializer(serializers.Serializer[Dict[str, Any]]):
             offset,
             page_size
         )
-        listings = [Listing(**listing_dict) for listing_dict in listing_dicts]
-        return listings, total_count
+        return listing_dicts, total_count
