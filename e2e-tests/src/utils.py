@@ -215,7 +215,7 @@ class Helper:
             insert_stmt = listings_table.insert().values(
                 title=listing.title,
                 description=listing.description,
-                updated_by=listing.updated_by,
+                updated_by_id=listing.updated_by,
                 updated_at=listing.updated_at
             )
             result = connection.execute(insert_stmt)
@@ -238,11 +238,12 @@ class Helper:
                 "description": listing.description,
                 "updated_by": listing.updated_by,
                 "updated_at": listing.updated_at,
+                "doc_type": "listing",
                 "coordinators": [
                     {
                         "coordinator_id": coordinator.id,
                         "coordinator_email": coordinator.email,
-                        "id": f"{coordinator.id}:{listing.id}",
+                        "id": f"coordinator:{coordinator.id}:{listing.id}",
                         "doc_type": "coordinator",
                     }
                     for coordinator in listing.coordinators

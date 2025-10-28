@@ -1,3 +1,4 @@
+import datetime
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
@@ -13,6 +14,8 @@ class Listing:
     title: str
     description: str
     coordinators: List[User]
+    updated_by: int
+    updated_at: datetime.datetime
 
 
 class ListingFactory:
@@ -30,7 +33,19 @@ class ListingFactory:
             "id": None,
             "title": self.faker.sentence(),
             "description": self.faker.text(),
+            "coordinators": [],
+            "updated_by": 0,
+            "updated_at": datetime.datetime.now(),
         }
         listing_values.update(kwargs)
+
+        # If coordinators provided and updated_by not set, default to first
+        # coordinator id
+        if (
+            listing_values.get("coordinators")
+            and not listing_values.get("updated_by")
+        ):
+            first = listing_values["coordinators"][0]
+            listing_values["updated_by"] = getattr(first, "id", 0) or 0
 
         return Listing(**listing_values)
