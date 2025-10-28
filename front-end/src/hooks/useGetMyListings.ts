@@ -1,11 +1,11 @@
-import { useApiCall } from "./useApiCall";
 import { getMyListings, GetMyListingsArgs } from "../services/listings";
-import useSWR from "swr";
+import { useAutomaticFetching } from "./useAutomaticFetching";
 
 export const useGetMyListings = (args: GetMyListingsArgs) => {
-  const getMyListingsApiCall = useApiCall(getMyListings);
-  const { data, isLoading } = useSWR(["my-listings", args], ([_, args]) =>
-    getMyListingsApiCall(args)
+  const { data, isLoading } = useAutomaticFetching(
+    args,
+    "my-listings",
+    getMyListings
   );
   return { listings: data, isLoading };
 };
