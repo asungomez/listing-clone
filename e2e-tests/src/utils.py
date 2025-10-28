@@ -8,6 +8,7 @@ from playwright.sync_api import Page
 from sqlalchemy import MetaData, Table, create_engine, inspect, text
 from sqlalchemy.engine import Engine
 
+from .factories.listing import Listing
 from .factories.user import User
 
 logger = logging.getLogger(__name__)
@@ -19,7 +20,11 @@ CUSTOM_SOLR_TRANSFORMATIONS: Dict[
         "user": lambda document: {
             **document,
             "email_ngram_ng": document.get("email_s")
-        }
+        },
+        "listing": lambda document: {
+            **document,
+            "doc_type_s": "listing",
+        },
     }
 
 
@@ -199,6 +204,55 @@ class Helper:
             )
         response.raise_for_status()
 
+    def insert_listing(self, listing: Listing) -> None:
+        """
+        Insert a listing into the test database.
+
+        :param listing: The Listing instance to insert.
+        """
+        with self.db_engine.begin() as connection:
+            listings_table = self.db_table("core_listing")
+            insert_stmt = listings_table.insert().values(
+                title=listing.title,
+                description=listing.description,
+                updated_by=listing.updated_by,
+                updated_at=listing.updated_at
+            )
+            result = connection.execute(insert_stmt)
+            id = result.inserted_primary_key[0]
+            listing.id = id
+
+            for coordinator in listing.coordinators:
+                listing_coordinators_table = self.db_table(
+                    "core_listingcoordinator"
+                )
+                insert_stmt = listing_coordinators_table.insert().values(
+                    listing_id=id,
+                    coordinator_id=coordinator.id
+                )
+                connection.execute(insert_stmt)
+
+            solr_document = {
+                "id": listing.id,
+                "title": listing.title,
+                "description": listing.description,
+                "updated_by": listing.updated_by,
+                "updated_at": listing.updated_at,
+                "coordinators": [
+                    {
+                        "coordinator_id": coordinator.id,
+                        "coordinator_email": coordinator.email,
+                        "id": f"{coordinator.id}:{listing.id}",
+                        "doc_type": "coordinator",
+                    }
+                    for coordinator in listing.coordinators
+                ]
+            }
+            self.index_solr_document(
+                document_type="listing",
+                document=solr_document
+            )
+
     def insert_user(self, user: User) -> None:
         """
         Insert a user into the test database.
@@ -314,6 +368,19 @@ class Helper:
         for key, value in document.items():
             if key == "id":
                 transformed_document[key] = f"{document_type}:{value}"
+            elif isinstance(value, list):
+                document_type = key[:-1] if key.endswith("s") else key
+                transformed_document[key] = [
+                    self.transform_solr_document(document_type, item)
+                    if isinstance(item, dict)
+                    else item
+                    for item in value
+                ]
+            elif isinstance(value, dict):
+                transformed_document[key] = self.transform_solr_document(
+                    key,
+                    value
+                )
             elif isinstance(value, str):
                 transformed_document[f"{key}_s"] = value
             elif isinstance(value, bool):
