@@ -5,6 +5,7 @@ import { AuthProvider } from "../context/auth/AuthProvider";
 import { AuthenticatedRoute } from "./AuthenticatedRoute";
 import { UnauthenticatedRoute } from "./UnauthenticatedRoute";
 import { ErrorPage } from "../pages/Error";
+import { MyListingsPage } from "../pages/MyListings";
 
 export const Router: FC = () => {
   return (
@@ -18,7 +19,7 @@ export const Router: FC = () => {
 
           <Route element={<AuthenticatedRoute />}>
             <Route path="my-listings">
-              <Route index element={<div>My Listings</div>} />
+              <Route index element={<MyListingsPage />} />
             </Route>
           </Route>
         </Routes>

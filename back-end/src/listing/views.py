@@ -3,6 +3,7 @@ from typing import Any
 from core.auth import (
     AuthenticatedAPIView, AuthenticatedRequest, AuthenticatedViewSet,
 )
+from core.serializers import PaginationSerializer
 from core.swagger import swagger_authenticated_schema
 from listing.serializers import (
     CreateListingSerializer, ListingSerializer, ListingsListResponseSerializer,
@@ -78,7 +79,8 @@ class MyListingsView(AuthenticatedAPIView):
 
     @swagger_authenticated_schema(
         responses={200: ListingsListResponseSerializer()},
-        operation_id="my_listings"
+        operation_id="my_listings",
+        query_serializer=PaginationSerializer[str],
     )
     def get(self, request: AuthenticatedRequest) -> Response:
         listings, total_count = self.serializer.search_by_coordinator_id(

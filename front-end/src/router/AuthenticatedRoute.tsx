@@ -21,9 +21,11 @@ export const AuthenticatedRoute: FC = () => {
     return null;
   }
   return (
-    <>
+    <div className="min-h-screen bg-gray-950 text-gray-100">
       <NavBar />
-      <Outlet />
-    </>
+      <main className="mx-auto max-w-screen-xl px-4 py-6 md:py-10">
+        <Outlet />
+      </main>
+    </div>
   );
 };
