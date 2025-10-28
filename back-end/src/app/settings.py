@@ -100,6 +100,7 @@ INSTALLED_APPS = [
     "corsheaders",
     "core",
     "user",
+    "listing",
     "rest_framework",
     "drf_yasg"
 ]

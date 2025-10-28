@@ -15,9 +15,27 @@ CUSTOM_SOLR_TRANSFORMATIONS: Dict[
     str,
     Callable[[Dict[str, Any]], Dict[str, Any]]
     ] = {
-        "user": lambda document: {
+    "user": lambda document: {
+        **document,
+        "email_ngram_ng": document.get("email_s")
+    },
+    "listing": lambda document: {
+        **document,
+        "doc_type_s": "listing",
+    },
+}
+
+CUSTOM_SOLR_REVERSE_TRANSFORMATIONS: Dict[
+    str,
+    Callable[[Dict[str, Any]], Dict[str, Any]]
+    ] = {
+        "listing": lambda document: {
             **document,
-            "email_ngram_ng": document.get("email_s")
+            "coordinators": (
+                [document.get("coordinators")]
+                if isinstance(document.get("coordinators"), dict)
+                else document.get("coordinators")
+            )
         }
     }
 
@@ -108,7 +126,9 @@ class Helper:
         This is used to remove all data from the db.
         """
         tables_to_clean = [
-            "core_user"
+            "core_user",
+            "core_listing",
+            "core_listingcoordinator",
         ]
         for table in tables_to_clean:
             query = f"DELETE FROM {table}"
@@ -141,6 +161,22 @@ class Helper:
         cipher = Fernet(self.encryption_key.encode())
         encrypted = cipher.encrypt(value.encode())
         return encrypted.decode()
+
+    def find_listing_by_id(self, listing_id: int) -> Optional[dict[str, Any]]:
+        """
+        Find a listing by id.
+
+        :param id: The id of the listing to find
+        :return: The listing object if found, None otherwise
+        """
+        result = self.search_solr(
+            document_type="listing",
+            query={"id": listing_id},
+        )
+        if result is None or len(result) == 0:
+            return None
+        first_result = result[0]
+        return first_result
 
     def find_user_by_email(self, email: str) -> Optional[dict[str, Any]]:
         """
@@ -229,6 +265,70 @@ class Helper:
             headers={"Content-Type": "application/json"}
             )
         response.raise_for_status()
+
+    def insert_listing(self, listing: dict[str, Any]) -> None:
+        """
+        Insert a listing into the database.
+
+        :param listing: The listing object to insert
+        """
+        if self.db_connection is None:
+            raise Exception("Database connection is not established")
+        cursor = self.db_connection.cursor()
+        query = """
+            INSERT INTO core_listing (
+                title,
+                description,
+                updated_by_id,
+                updated_at
+            )
+            VALUES (
+                %(title)s,
+                %(description)s,
+                %(updated_by)s,
+                NOW()
+            )
+            RETURNING id
+        """
+        cursor.execute(query, listing)
+        returned_element = cursor.fetchone()
+        if returned_element is None:
+            raise Exception("Error inserting listing into the database")
+        listing["id"] = returned_element[0]
+        coordinators = listing.get("coordinators")
+        if isinstance(coordinators, list):
+            for i, coordinator in enumerate[Dict[str, Any]](coordinators):
+                coord_query = """
+                    INSERT INTO core_listingcoordinator (
+                        listing_id,
+                        coordinator_id
+                    )
+                    VALUES (
+                        %(listing_id)s,
+                        %(coordinator_id)s
+                    )
+                    RETURNING id
+                """
+                cursor.execute(coord_query, {
+                    "listing_id": listing["id"],
+                    "coordinator_id": coordinator["coordinator_id"],
+                })
+                returned_element = cursor.fetchone()
+                if returned_element is None:
+                    raise Exception(
+                        "Error inserting listing coordinator into the database"
+                    )
+                listing["coordinators"][i]["id"] = (
+                    f"coordinator:{returned_element[0]}"
+                    f":{listing['id']}"
+                )
+                listing["coordinators"][i]["doc_type"] = "coordinator"
+        self.db_connection.commit()
+        cursor.close()
+        self.index_solr_document(
+            document_type="listing",
+            document=listing
+        )
 
     def insert_user(self, user: dict[str, Any]) -> None:
         """
@@ -456,7 +556,8 @@ class Helper:
 
     def reverse_transform_solr_document(
         self,
-        document: dict[str, Any]
+        document: dict[str, Any],
+        document_type: str
     ) -> dict[str, Any]:
         """
         Reverse transform a document to get it ready for the database.
@@ -469,11 +570,22 @@ class Helper:
         for key, value in document.items():
             if key == "id":
                 try:
-                    id_value = value.split(":")[1]
+                    id_value = value.split(":")[-1]
                     numeric_value = int(id_value)
                     transformed_document[key] = numeric_value
                 except Exception as e:
                     raise e
+            elif isinstance(value, list):
+                transformed_document[key] = [
+                    self.reverse_transform_solr_document(item, "child")
+                    if isinstance(item, dict)
+                    else item
+                    for item in value
+                ]
+            elif isinstance(value, dict):
+                transformed_document[key] = (
+                    self.reverse_transform_solr_document(value, "child")
+                )
             elif key.endswith("_s"):
                 transformed_document[key[:-2]] = value
             elif key.endswith("_i"):
@@ -482,6 +594,11 @@ class Helper:
                 transformed_document[key[:-2]] = float(value)
             elif key.endswith("_b"):
                 transformed_document[key[:-2]] = bool(value)
+        if document_type in CUSTOM_SOLR_REVERSE_TRANSFORMATIONS:
+            transformer_function = CUSTOM_SOLR_REVERSE_TRANSFORMATIONS[
+                document_type
+            ]
+            transformed_document = transformer_function(transformed_document)
         return transformed_document
 
     def search_solr(
@@ -497,17 +614,32 @@ class Helper:
         :return: The result of the search
         """
         transformed_query = self.transform_solr_document(document_type, query)
-        query_string = "&".join([
-            f"{key}:{value}" for key, value in transformed_query.items()
-            ])
+
+        def escape_value(value: Any) -> str:
+            if isinstance(value, str):
+                return value.replace(":", r"\:")
+            return str(value)
+
+        query_parts = [
+            f"{key}:{escape_value(value)}"
+            for key, value in transformed_query.items()
+        ]
+        query_string = " AND ".join(query_parts)
+        params: Dict[str, Any] = {
+            "q": query_string,
+            "wt": "json",
+            "fl": "*,[child childFilter=*:*]"
+        }
+
         response = requests.get(
-            f"{self.solr_url}/select?q={query_string}&wt=json"
+            f"{self.solr_url}/select",
+            params=params
             )
         response.raise_for_status()
         response_body = response.json()
         docs = response_body.get("response", {}).get("docs", [])
         return [
-            self.reverse_transform_solr_document(doc)
+            self.reverse_transform_solr_document(doc, document_type)
             for doc in docs
         ]
 
@@ -527,6 +659,18 @@ class Helper:
         for key, value in document.items():
             if key == "id":
                 transformed_document[key] = f"{document_type}:{value}"
+            elif isinstance(value, list):
+                transformed_document[key] = [
+                    self.transform_solr_document("child", item)
+                    if isinstance(item, dict)
+                    else item
+                    for item in value
+                ]
+            elif isinstance(value, dict):
+                transformed_document[key] = self.transform_solr_document(
+                    "child",
+                    value
+                )
             elif isinstance(value, str):
                 transformed_document[f"{key}_s"] = value
             elif isinstance(value, bool):

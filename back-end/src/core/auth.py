@@ -13,6 +13,7 @@ from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.permissions import BasePermission, IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.views import APIView
+from rest_framework.viewsets import ViewSet
 from user.serializers import UserSerializer
 
 
@@ -408,6 +409,11 @@ class AuthenticatedRequest(Request):
 
 
 class AuthenticatedAPIView(APIView):
+    authentication_classes = [OktaAuthentication]
+    permission_classes = [IsAuthenticated]
+
+
+class AuthenticatedViewSet(ViewSet):
     authentication_classes = [OktaAuthentication]
     permission_classes = [IsAuthenticated]
 

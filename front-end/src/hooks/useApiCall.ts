@@ -36,7 +36,7 @@ export const useApiCall = <ResponseType = void, ArgsType = void>(
         }
       }
     },
-    [addAlert, showAlertOnError, fetcher]
+    [addAlert, showAlertOnError, fetcher, mockSessionUser?.id, actAsMockedUser]
   );
   return apiCall;
 };

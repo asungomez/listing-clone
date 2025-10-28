@@ -67,7 +67,8 @@ class UserSerializer(serializers.ModelSerializer[User]):
         page_size: int
     ) -> Tuple[List[User], int]:
         """Get paginated users and total count from the Solr index"""
-        users, total = self.indexer.all_users(offset, page_size)
+        raw_results, total = self.indexer.all_users(offset, page_size)
+        users = [User(**result) for result in raw_results]
         return users, total
 
     def search_by_email(

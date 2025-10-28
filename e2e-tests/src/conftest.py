@@ -8,6 +8,7 @@ from testcontainers.core.container import DockerContainer  # type: ignore
 from testcontainers.core.network import Network  # type: ignore
 from testcontainers.core.waiting_utils import wait_for_logs  # type: ignore
 
+from .factories.listing import ListingFactory
 from .factories.user import UserFactory
 from .utils import Helper
 
@@ -294,3 +295,11 @@ def user_factory() -> UserFactory:
             user = user_factory.generate(is_active=False)
     """
     return UserFactory()
+
+
+@pytest.fixture
+def listing_factory() -> ListingFactory:
+    """
+    Fixture that provides a ListingFactory instance.
+    """
+    return ListingFactory()

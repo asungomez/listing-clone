@@ -1,4 +1,5 @@
 from playwright.sync_api import Page, expect
+from src.factories.listing import ListingFactory
 from src.factories.user import UserFactory
 from src.utils import Helper
 
@@ -52,3 +53,46 @@ def test_switch_user_when_authenticated_as_admin(
         page.get_by_text(impersonated_user.email).click()
         expect(page.get_by_text(impersonated_user.email)).to_be_visible()
         expect(page.get_by_text(admin_user.email)).not_to_be_visible()
+
+
+def test_switch_user_with_listings(
+    page: Page,
+    tests_helper: Helper,
+    user_factory: UserFactory,
+    listing_factory: ListingFactory
+) -> None:
+    """
+    Test that switching users changes the listings
+    """
+    admin_user = user_factory.generate(
+        is_superuser=True,
+        email="admin.email@email.net"
+    )
+    tests_helper.insert_user(admin_user)
+    impersonated_user = user_factory.generate(
+        email="impersonated.email@email.net"
+    )
+    tests_helper.insert_user(impersonated_user)
+    admin_user_listing = listing_factory.generate(
+        coordinators=[admin_user],
+    )
+    tests_helper.insert_listing(admin_user_listing)
+    impersonated_user_listing = listing_factory.generate(
+        coordinators=[impersonated_user],
+    )
+    tests_helper.insert_listing(impersonated_user_listing)
+    with tests_helper.authenticated_context(
+        page=page,
+        email=admin_user.email
+    ):
+        page.goto("/my-listings")
+        expect(page.get_by_text(admin_user_listing.title)).to_be_visible()
+        page.get_by_label("User menu").click()
+        page.get_by_placeholder("Type an email...").fill(
+            impersonated_user.email
+        )
+        page.get_by_text(impersonated_user.email).click()
+        expect(
+            page.get_by_text(impersonated_user_listing.title)
+        ).to_be_visible()
+        expect(page.get_by_text(admin_user_listing.title)).not_to_be_visible()
