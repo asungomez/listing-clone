@@ -5,15 +5,15 @@ import useSWR from "swr";
 
 export const useAutomaticFetching = <ResponseType = void, ArgsType = void>(
   args: ArgsType,
-  cacheCategory: string,
   fetcher: (args: ArgsType) => Promise<ResponseType>,
   options: UseApiCallOptions = {}
 ) => {
   const apiCall = useApiCall(fetcher, options);
-  const { user } = useAuth();
+  const { user, authenticatedUser } = useAuth();
+  const cacheCategory = fetcher.name;
   const cacheKey: [string, ArgsType, number | undefined] = useMemo(() => {
     if (options.actAsMockedUser == false) {
-      return [cacheCategory, args, undefined];
+      return [cacheCategory, args, authenticatedUser?.id];
     } else {
       return [cacheCategory, args, user?.id];
     }
