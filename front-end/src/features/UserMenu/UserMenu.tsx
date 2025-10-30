@@ -30,13 +30,17 @@ export const UserMenu: FC = () => {
           }
         : null
     );
-  const { searchUsers } = useSearchUsers(SEARCH_RESULTS_LIMIT, {
+  const { searchUsers } = useSearchUsers({
     actAsMockedUser: false,
   });
 
   const emailSuggestions = useCallback(
     async (search: string): Promise<SuggestionItem<SuggestedUser>[]> => {
-      const list = (await searchUsers(search)) ?? [];
+      const list =
+        (await searchUsers({
+          email: search,
+          page_size: SEARCH_RESULTS_LIMIT,
+        })) ?? [];
       const suggestions = list.map((e) => ({
         label: e.email ?? "",
         value: e,
